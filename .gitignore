@@ -1,19 +1,67 @@
+# Bytecode and caches
 __pycache__/
 *.py[cod]
 *$py.class
-*.egg-info/
-.eggs/
-dist/
-build/
+*.pyo
+*.pyd
+.cache/
+
+# Virtual environments
 .venv/
 venv/
-.env
-.env.*
+env/
+ENV/
+
+# Packaging / flit
+build/
+dist/
+*.egg
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test, type-check, and coverage tooling
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.pytype/
+.pyre/
+.tox/
+.nox/
+.hypothesis/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
-*.pyd
+*.cover
+.dmypy.json
+dmypy.json
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs and crash dumps
+*.log
+*.dmp
+*.stackdump
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.code-workspace
+*.swp
+*~
+
+# OS junk
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Local scratch (prototypes, one-off Win32 probes)
+.bare/
