@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BareWinGUI — Technische Referenz &amp; API-Spezifikation</title>
+  <style>
+    /* -----------------------------------------------------------------------
+       Design-System nach bastian-fluegel.de
+       Minimalistisch, matter Anthrazitton, satter Akzent (#f97316), klare Linien
+       ----------------------------------------------------------------------- */
+    :root[data-theme="dark"] {
+      --bg-canvas: #0e1116;
+      --bg-surface: #151921;
+      --bg-elevated: #1d222d;
+      --bg-code: #0b0d11;
+      --border-subtle: #242b38;
+      --border-strong: #333c4e;
+      --text-main: #f0f3f6;
+      --text-muted: #8b949e;
+      --text-dim: #5c6470;
+      --accent: #f97316;
+      --accent-hover: #fb923c;
+      --accent-dim: rgba(249, 115, 22, 0.12);
+      --badge-border: rgba(249, 115, 22, 0.35);
+      --table-stripe: #12151b;
+      --table-header: #1a202a;
+    }
+
+    :root[data-theme="light"] {
+      --bg-canvas: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-elevated: #f1f5f9;
+      --bg-code: #f1f5f9;
+      --border-subtle: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --text-dim: #94a3b8;
+      --accent: #ea580c;
+      --accent-hover: #c2410c;
+      --accent-dim: rgba(234, 88, 12, 0.08);
+      --badge-border: rgba(234, 88, 12, 0.3);
+      --table-stripe: #f8fafc;
+      --table-header: #f1f5f9;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 14.5px;
+      line-height: 1.65;
+      display: flex;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* Mehrsprachigkeit über Body-Klasse */
+    body.lang-de .en-text { display: none !important; }
+    body.lang-en .de-text { display: none !important; }
+
+    /* -----------------------------------------------------------------------
+       Sidebar
+       ----------------------------------------------------------------------- */
+    #sidebar {
+      width: 310px;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-subtle);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 24px 20px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .brand h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+    }
+
+    .brand .badge {
+      display: inline-block;
+      align-self: flex-start;
+      font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid var(--badge-border);
+    }
+
+    /* Schalter für Sprache & Design */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .toggle-group {
+      display: flex;
+      background: var(--bg-canvas);
+      padding: 3px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .toggle-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+      font-size: 0.74rem;
+      font-weight: 600;
+      padding: 5px 0;
+      cursor: pointer;
+      border-radius: 4px;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+
+    .toggle-btn.active {
+      background: var(--bg-elevated);
+      color: var(--accent);
+      border: 1px solid var(--border-strong);
+    }
+
+    nav ul { list-style: none; }
+    nav li { margin-bottom: 2px; }
+
+    nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.88rem;
+      display: block;
+      padding: 5px 8px;
+      border-radius: 5px;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    nav a:hover {
+      color: var(--text-main);
+      background: var(--bg-elevated);
+    }
+
+    .nav-header {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin: 16px 0 6px 8px;
+    }
+
+    /* -----------------------------------------------------------------------
+       Inhaltsbereich
+       ----------------------------------------------------------------------- */
+    #content {
+      flex: 1;
+      max-width: 1040px;
+      padding: 48px 64px;
+      overflow-y: auto;
+    }
+
+    h2 {
+      font-size: 1.65rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+      margin-top: 48px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 10px;
+    }
+
+    h3 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-top: 28px;
+      margin-bottom: 10px;
+      font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    }
+
+    p { margin-bottom: 14px; color: var(--text-main); }
+    .lead { font-size: 1.08rem; color: var(--text-muted); margin-bottom: 28px; }
+
+    code {
+      font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+      font-size: 0.86em;
+      background: var(--bg-code);
+      color: var(--text-main);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    pre {
+      background: var(--bg-code);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 16px;
+      overflow-x: auto;
+      margin: 14px 0 22px;
+    }
+
+    pre code {
+      background: transparent;
+      border: none;
+      padding: 0;
+      font-size: 0.86rem;
+      color: var(--text-main);
+    }
+
+    .panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
+      padding: 16px 20px;
+      margin: 18px 0 24px;
+    }
+
+    .panel ul {
+      margin-left: 20px;
+      margin-top: 8px;
+    }
+
+    .panel li {
+      margin-bottom: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 28px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    th, td {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 0.88rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    th {
+      background: var(--table-header);
+      color: var(--text-main);
+      font-weight: 600;
+      font-size: 0.80rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    td code { white-space: nowrap; }
+  </style>
+</head>
+<body class="lang-de">
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="brand">
+      <h1>BareWinGUI</h1>
+      <span class="badge">Zero-Dependency Win32</span>
+    </div>
+
+    <!-- Toggles für Sprache und Farbmodus -->
+    <div class="controls-grid">
+      <div class="toggle-group" title="Sprache wählen / Select language">
+        <button class="toggle-btn active" id="btn-de" onclick="setLang('de')">DE</button>
+        <button class="toggle-btn" id="btn-en" onclick="setLang('en')">EN</button>
+      </div>
+
+      <div class="toggle-group" title="Farbdesign umschalten / Switch color theme">
+        <button class="toggle-btn active" id="btn-dark" onclick="setTheme('dark')">DARK</button>
+        <button class="toggle-btn" id="btn-light" onclick="setTheme('light')">LIGHT</button>
+      </div>
+    </div>
+
+    <nav>
+      <ul>
+        <li><a href="#overview"><span class="de-text">Doktrin &amp; Konzept</span><span class="en-text">Doctrine &amp; Concept</span></a></li>
+        <li><a href="#abi"><span class="de-text">64-Bit ABI &amp; Typen</span><span class="en-text">64-Bit ABI &amp; Types</span></a></li>
+
+        <div class="nav-header"><span class="de-text">Architektur</span><span class="en-text">Architecture</span></div>
+        <li><a href="#core"><span class="de-text">DPI &amp; Lifecycle</span><span class="en-text">DPI &amp; Lifecycle</span></a></li>
+        <li><a href="#window"><span class="de-text">Window &amp; Dispatcher</span><span class="en-text">Window &amp; Dispatcher</span></a></li>
+        <li><a href="#layout"><span class="de-text">VBox / HBox Layout</span><span class="en-text">VBox / HBox Layout</span></a></li>
+
+        <div class="nav-header"><span class="de-text">Steuerelemente</span><span class="en-text">Controls</span></div>
+        <li><a href="#controls-base"><span class="de-text">Control Basisklasse</span><span class="en-text">Control Base Class</span></a></li>
+        <li><a href="#controls-button">Button, CheckBox, Radio</a></li>
+        <li><a href="#controls-text">Label &amp; TextInput</a></li>
+        <li><a href="#controls-choice">ComboBox &amp; ListBox</a></li>
+
+        <div class="nav-header"><span class="de-text">Systemdialoge</span><span class="en-text">System Dialogs</span></div>
+        <li><a href="#dialogs-msg"><span class="de-text">Nachrichten-Boxen</span><span class="en-text">Message Boxes</span></a></li>
+        <li><a href="#dialogs-input"><span class="de-text">Modale InputBox</span><span class="en-text">Modal InputBox</span></a></li>
+        <li><a href="#dialogs-files"><span class="de-text">Dateien &amp; Ordner</span><span class="en-text">Files &amp; Folders</span></a></li>
+        <li><a href="#dialogs-pickers"><span class="de-text">Farbe &amp; Schriftart</span><span class="en-text">Color &amp; Font</span></a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- Inhaltsbereich -->
+  <main id="content">
+
+    <!-- 1. Doktrin & Konzept -->
+    <section id="overview">
+      <h2>
+        <span class="de-text">1. Sicherheitsdoktrin &amp; Leitprinzipien</span>
+        <span class="en-text">1. Security Doctrine &amp; Guiding Principles</span>
+      </h2>
+
+      <p class="lead">
+        <span class="de-text">BareWinGUI ist ein minimalistisches Win32-GUI-Framework für Python 3.11+. Es bindet direkt über <code>ctypes</code> an die Betriebssystem-DLLs von Windows an — vollständig ohne externe Python-Pakete, C++-Compiler, WebView2 oder Node.js.</span>
+        <span class="en-text">BareWinGUI is a minimalist Win32 GUI framework engineered for Python 3.11+. Binding directly to core Windows DLLs via <code>ctypes</code>, it completely eliminates third-party packages, C++ compiler toolchains, WebView2, and Node.js runtimes.</span>
+      </p>
+
+      <div class="panel">
+        <span class="de-text">
+          <strong>Architektur-Vorgaben:</strong>
+          <ul>
+            <li><strong>Supply-Chain-Sicherheit:</strong> <code>dependencies = []</code>. Null Drittanbieter-Risiken für OT/SCADA, Incident-Response und KRITIS-Systeme.</li>
+            <li><strong>Deterministischer Footprint:</strong> Kaltstart unter 15 ms, Basisspeicher &lt; 15 MB RAM.</li>
+            <li><strong>Native Windows 10/11 Integration:</strong> Automatische Segoe UI-Schriftzuweisung und Common Controls v6 Theming.</li>
+          </ul>
+        </span>
+        <span class="en-text">
+          <strong>Architectural Directives:</strong>
+          <ul>
+            <li><strong>Supply Chain Hardening:</strong> <code>dependencies = []</code>. Zero third-party CVE exposure for OT/SCADA, IR toolsets, and critical infrastructures.</li>
+            <li><strong>Deterministic Footprint:</strong> Cold boot &lt; 15 ms, idle memory consumption &lt; 15 MB RAM.</li>
+            <li><strong>Native Windows 10/11 Rendering:</strong> Automatic Segoe UI font propagation and comctl32 v6 visual styling.</li>
+          </ul>
+        </span>
+      </div>
+    </section>
+
+    <!-- 2. 64-Bit ABI -->
+    <section id="abi">
+      <h2>
+        <span class="de-text">2. 64-Bit ABI &amp; Pointer-Typen (<code>barewingui.types</code>)</span>
+        <span class="en-text">2. 64-Bit ABI &amp; Pointer Types (<code>barewingui.types</code>)</span>
+      </h2>
+
+      <p>
+        <span class="de-text">Um Zeigerabschneidungen und <code>OverflowError</code>-Abstürze auf 64-Bit-Systemen auszuschließen, sind alle Typen pointer-adaptiv deklariert:</span>
+        <span class="en-text">To prevent pointer truncation and 64-bit <code>OverflowError</code> exceptions, all core types are explicitly sized via pointer-adaptive C types:</span>
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Win32 Typ</th>
+            <th>ctypes Definition</th>
+            <th>x86 (32-Bit)</th>
+            <th>x64 (64-Bit)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>LRESULT</code> / <code>LONG_PTR</code></td>
+            <td><code>ctypes.c_ssize_t</code></td>
+            <td>4 Bytes</td>
+            <td>8 Bytes</td>
+          </tr>
+          <tr>
+            <td><code>WPARAM</code> / <code>UINT_PTR</code></td>
+            <td><code>ctypes.c_size_t</code></td>
+            <td>4 Bytes</td>
+            <td>8 Bytes</td>
+          </tr>
+          <tr>
+            <td><code>LPARAM</code></td>
+            <td><code>ctypes.c_ssize_t</code></td>
+            <td>4 Bytes</td>
+            <td>8 Bytes</td>
+          </tr>
+          <tr>
+            <td><code>HWND</code> / <code>HANDLE</code></td>
+            <td><code>wintypes.HANDLE</code> / <code>c_void_p</code></td>
+            <td>4 Bytes</td>
+            <td>8 Bytes</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 3. Core & Lifecycle -->
+    <section id="core">
+      <h2>
+        <span class="de-text">3. DPI &amp; Application Lifecycle (<code>barewingui.core</code>)</span>
+        <span class="en-text">3. DPI &amp; Application Lifecycle (<code>barewingui.core</code>)</span>
+      </h2>
+
+      <p>
+        <span class="de-text">Verwaltet Prozess-Initialisierung, Per-Monitor DPI Awareness v2 und die synchrone Message-Pump.</span>
+        <span class="en-text">Manages process bootstrapping, Per-Monitor DPI Awareness v2, and the synchronous message dispatch loop.</span>
+      </p>
+
+      <h3>Application.initialize()</h3>
+      <p>
+        <span class="de-text">Initialisiert <code>SetProcessDpiAwarenessContext(PER_MONITOR_AWARE_V2)</code> und lädt Comctl32 v6 einmalig pro Prozess.</span>
+        <span class="en-text">Applies <code>SetProcessDpiAwarenessContext(PER_MONITOR_AWARE_V2)</code> and loads Comctl32 v6 once per process.</span>
+      </p>
+
+      <h3>Application.run(main_window=None) -&gt; int</h3>
+      <p>
+        <span class="de-text">Startet die native <code>GetMessageW</code>/<code>DispatchMessageW</code>-Schleife. Blockiert, bis alle Fenster geschlossen sind oder <code>Application.quit()</code> aufgerufen wird.</span>
+        <span class="en-text">Enters the native <code>GetMessageW</code>/<code>DispatchMessageW</code> pump. Blocks until all top-level windows terminate or <code>Application.quit()</code> is invoked.</span>
+      </p>
+    </section>
+
+    <!-- 4. Window -->
+    <section id="window">
+      <h2>
+        <span class="de-text">4. Window &amp; Message Routing (<code>barewingui.window</code>)</span>
+        <span class="en-text">4. Window &amp; Message Routing (<code>barewingui.window</code>)</span>
+      </h2>
+
+      <p>
+        <span class="de-text">Kapselt das <code>HWND</code>-Top-Level-Fenster mit RAII-Lebenszyklus und Garbage-Collection-sicher verankertem WNDPROC-Funktionszeiger.</span>
+        <span class="en-text">Encapsulates the top-level <code>HWND</code> with strict RAII resource tracking and a GC-anchored WNDPROC callback delegate.</span>
+      </p>
+
+      <pre><code>win = Window(title="Security Console", width=500, height=350)
+win.on_close = lambda: True  # Return False verwehrt das Beenden
+win.run()</code></pre>
+
+      <table>
+        <thead>
+          <tr>
+            <th><span class="de-text">Methode / Attribut</span><span class="en-text">Method / Property</span></th>
+            <th>Signatur</th>
+            <th><span class="de-text">Funktion</span><span class="en-text">Function</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>show()</code></td>
+            <td><code>show(cmd: ShowWindowCmd)</code></td>
+            <td><span class="de-text">Macht das Fenster sichtbar (<code>SW_SHOWNORMAL</code>).</span><span class="en-text">Makes the window visible and triggers repaint.</span></td>
+          </tr>
+          <tr>
+            <td><code>close()</code></td>
+            <td><code>close()</code></td>
+            <td><span class="de-text">Postet synchron <code>WM_CLOSE</code>.</span><span class="en-text">Dispatches a synchronous <code>WM_CLOSE</code> message.</span></td>
+          </tr>
+          <tr>
+            <td><code>destroy()</code></td>
+            <td><code>destroy()</code></td>
+            <td><span class="de-text">Ruft <code>DestroyWindow</code> auf und leert Referenzen (RAII).</span><span class="en-text">Destroys native HWND and cleans active registries.</span></td>
+          </tr>
+          <tr>
+            <td><code>on_resize</code></td>
+            <td><code>Callable[[int, int], None]</code></td>
+            <td><span class="de-text">Hook für Fensterbreite und -höhe bei Größenänderung.</span><span class="en-text">Triggered when client area dimensions change.</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 5. Layout Sizers -->
+    <section id="layout">
+      <h2>
+        <span class="de-text">5. VBox / HBox Layout Engine (<code>barewingui.layout</code>)</span>
+        <span class="en-text">5. VBox / HBox Layout Engine (<code>barewingui.layout</code>)</span>
+      </h2>
+
+      <p>
+        <span class="de-text">Schlankes Box-Sizer-System für dynamische Steuerelement-Anordnung ohne statische Pixel-Offsets.</span>
+        <span class="en-text">Lightweight box-sizer layout engine providing responsive alignment without absolute coordinate binding.</span>
+      </p>
+
+      <pre><code>from barewingui import VBox, HBox, Button, TextInput
+
+root = VBox(padding=12, spacing=8)
+root.add(TextInput(win), stretch=1)  # Expandiert flexibel
+
+bar = HBox(spacing=8, padding=0, fixed_size=32)
+bar.add_stretch()                    # Drückt Elemente nach rechts
+bar.add(Button(win, text="Start", size=(100, 32)))
+root.add(bar)
+
+root.attach(win)                     # Verbindet Layout mit WM_SIZE des Fensters</code></pre>
+    </section>
+
+    <!-- 6. Controls -->
+    <section id="controls-base">
+      <h2>
+        <span class="de-text">6. Steuerelemente (<code>barewingui.controls</code>)</span>
+        <span class="en-text">6. Control Components (<code>barewingui.controls</code>)</span>
+      </h2>
+
+      <h3 id="controls-button">Button, CheckBox, RadioButton</h3>
+      <p>
+        <span class="de-text">Basieren auf der Win32-Fensterklasse <code>BUTTON</code>.</span>
+        <span class="en-text">Native controls powered by the Win32 <code>BUTTON</code> window class.</span>
+      </p>
+      <ul>
+        <li><code>Button(parent, text="Click", on_click=func, default=False)</code></li>
+        <li><code>CheckBox(parent, text="Logging", checked=True, on_click=func)</code></li>
+        <li><code>RadioButton(parent, text="Mode", checked=False, group_start=False)</code></li>
+      </ul>
+
+      <h3 id="controls-text">Label &amp; TextInput</h3>
+      <p>
+        <span class="de-text">Beschriftungen und Textfelder mit transparenter Hintergrundbehandlung via <code>WM_CTLCOLORSTATIC</code>.</span>
+        <span class="en-text">Static text and edit inputs with transparent background handling via <code>WM_CTLCOLORSTATIC</code>.</span>
+      </p>
+      <ul>
+        <li><code>Label(parent, text="Host:", align="left"|"center"|"right")</code></li>
+        <li><code>TextInput(parent, text="", multiline=False, password=False, readonly=False, on_change=func)</code></li>
+      </ul>
+
+      <h3 id="controls-choice">ComboBox &amp; ListBox</h3>
+      <p>
+        <span class="de-text">Auswahlelemente mit automatischer Dropdown-Höhenkorrektur.</span>
+        <span class="en-text">Selection lists resolving native Win32 dropdown height collapse issues.</span>
+      </p>
+      <ul>
+        <li><code>ComboBox(parent, items=["A", "B"], selected_index=0, on_change=func)</code></li>
+        <li><code>ListBox(parent, items=["Log 1", "Log 2"], on_change=func, on_double_click=func)</code></li>
+      </ul>
+    </section>
+
+    <!-- 7. Dialogs -->
+    <section id="dialogs-msg">
+      <h2>
+        <span class="de-text">7. Modale Systemdialoge (<code>barewingui.dialogs</code>)</span>
+        <span class="en-text">7. Modal System Dialogs (<code>barewingui.dialogs</code>)</span>
+      </h2>
+
+      <p>
+        <span class="de-text">Autarke Dialogfunktionen, die den Elternprozess während der Anzeige modal sperren.</span>
+        <span class="en-text">Standalone modal primitives blocking input to parent windows until resolved.</span>
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th><span class="de-text">Funktion</span><span class="en-text">Routine</span></th>
+            <th><span class="de-text">Signatur &amp; Parameter</span><span class="en-text">Signature &amp; Parameters</span></th>
+            <th><span class="de-text">Rückgabe</span><span class="en-text">Return Type</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>message_box()</code></td>
+            <td><code>message, title="Info", icon="info", buttons="ok", parent=None</code></td>
+            <td><code>"ok"|"cancel"|"yes"|"no"</code></td>
+          </tr>
+          <tr>
+            <td><code>info_box()</code></td>
+            <td><code>message, title="Information", parent=None</code></td>
+            <td><code>None</code></td>
+          </tr>
+          <tr>
+            <td><code>warning_box()</code></td>
+            <td><code>message, title="Warnung", parent=None</code></td>
+            <td><code>None</code></td>
+          </tr>
+          <tr>
+            <td><code>error_box()</code></td>
+            <td><code>message, title="Fehler", parent=None</code></td>
+            <td><code>None</code></td>
+          </tr>
+          <tr>
+            <td><code>confirm_box()</code></td>
+            <td><code>message, title="Bestätigung", parent=None</code></td>
+            <td><code>bool</code></td>
+          </tr>
+          <tr>
+            <td><code>input_box()</code></td>
+            <td><code>prompt, title="Eingabe", default="", password=False, parent=None</code></td>
+            <td><code>str | None</code></td>
+          </tr>
+          <tr>
+            <td><code>open_file()</code></td>
+            <td><code>title="Datei öffnen", default_dir="", filters=[("Logs", "*.log")]</code></td>
+            <td><code>str | None</code></td>
+          </tr>
+          <tr>
+            <td><code>save_file()</code></td>
+            <td><code>title="Speichern", default_name="", default_ext="txt", filters=...</code></td>
+            <td><code>str | None</code></td>
+          </tr>
+          <tr>
+            <td><code>pick_folder()</code></td>
+            <td><code>title="Ordner auswählen", parent=None</code></td>
+            <td><code>str | None</code></td>
+          </tr>
+          <tr>
+            <td><code>choose_color()</code></td>
+            <td><code>initial_color=(R, G, B), parent=None</code></td>
+            <td><code>tuple[int, int, int] | None</code></td>
+          </tr>
+          <tr>
+            <td><code>choose_font()</code></td>
+            <td><code>parent=None</code></td>
+            <td><code>dict | None</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+
+  <script>
+    function setLang(lang) {
+      document.body.classList.remove('lang-de', 'lang-en');
+      document.body.classList.add('lang-' + lang);
+      document.getElementById('btn-de').classList.toggle('active', lang === 'de');
+      document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+      try { localStorage.setItem('barewingui_lang', lang); } catch (e) {}
+    }
+
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.getElementById('btn-dark').classList.toggle('active', theme === 'dark');
+      document.getElementById('btn-light').classList.toggle('active', theme === 'light');
+      try { localStorage.setItem('barewingui_theme', theme); } catch (e) {}
+    }
+
+    // Gespeicherte Präferenzen beim Laden wiederherstellen
+    (function initPreferences() {
+      try {
+        const savedLang = localStorage.getItem('barewingui_lang');
+        if (savedLang) setLang(savedLang);
+
+        const savedTheme = localStorage.getItem('barewingui_theme');
+        if (savedTheme) setTheme(savedTheme);
+      } catch (e) {}
+    })();
+  </script>
+</body>
+</html>
