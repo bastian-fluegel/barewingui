@@ -5,37 +5,40 @@ build-backend = "flit_core.buildapi"
 [project]
 name = "barewingui"
 version = "0.1.0"
-description = "Pure Win32 GUI bindings for Python without runtime dependencies or C compilers."
+description = "Deterministic, zero-dependency native Win32 GUI framework for Python."
 readme = "README.md"
-requires-python = ">=3.10"
-license = {text = "MIT"}
+license = { text = "MIT" }
+requires-python = ">=3.11"
 authors = [
-    {name = "Bastian Flügel"}
+    { name = "Bastian Flügel" }
 ]
-keywords = ["win32", "gui", "ctypes", "native", "windows", "desktop"]
+keywords = [
+    "win32",
+    "gui",
+    "desktop",
+    "native",
+    "ctypes",
+    "zero-dependency",
+    "windows"
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Environment :: Win32 (MS Windows)",
     "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
     "Operating System :: Microsoft :: Windows",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: User Interfaces",
-    "Typing :: Typed",
+    "Topic :: System :: Systems Administration",
+    "Typing :: Typed"
 ]
-
-# Zero Dependencies als architektonisches Statement
 dependencies = []
 
 [project.urls]
 Homepage = "https://bastian-fluegel.de"
 Repository = "https://github.com/bastian-fluegel/barewingui"
-
-[tool.flit.sdist]
-exclude = [
-    ".git*",
-    "examples/",
-    "tests/",
-]
+Issues = "https://github.com/bastian-fluegel/barewingui/issues"

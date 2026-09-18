@@ -4,12 +4,6 @@ verify_dialogs.py
 Interaktiver Härtetest für alle 10 nativen Win32-Systemdialoge in barewingui.
 """
 
-import os
-import sys
-
-# Projekt-Root zur Laufzeit auffindbar machen
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from barewingui.dialogs import (
     about_dialog,
     choose_color,
