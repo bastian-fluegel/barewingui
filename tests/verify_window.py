@@ -17,7 +17,8 @@ from ctypes import wintypes
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from barewingui.constants import ButtonNotification, EditNotification, WM
-from barewingui.controls import Button, CheckBox, Label, RadioButton, TextInput
+from barewingui.controls import Button, CheckBox, ComboBox, Label, ListBox, RadioButton, TextInput
+from barewingui.controls.choice import CBN_SELCHANGE, LBN_SELCHANGE
 from barewingui.types import user32
 from barewingui.window import Window
 
@@ -144,6 +145,54 @@ class TestBareWinGUIWindow(unittest.TestCase):
 
             self.assertTrue(len(captured_text) >= 1, "Es muss mindestens ein Event gefeuert worden sein.")
             self.assertEqual(captured_text[-1], "Update 1", "Der zuletzt empfangene Text muss korrekt sein.")
+
+    def test_combobox_and_listbox_selection(self) -> None:
+        """Prüft Einträge, Auswahl und WM_COMMAND-Routing für ComboBox und ListBox."""
+        combo_events: list[tuple[int, str]] = []
+        list_events: list[tuple[int, str]] = []
+
+        def on_combo(idx: int, val: str) -> None:
+            combo_events.append((idx, val))
+
+        def on_list(idx: int, val: str) -> None:
+            list_events.append((idx, val))
+
+        with Window(title="Choice Controls Test", width=400, height=300) as win:
+            combo = ComboBox(
+                win,
+                items=["Alpha", "Beta", "Gamma"],
+                selected_index=1,
+                on_change=on_combo,
+            )
+            lst = ListBox(
+                win,
+                items=["Eins", "Zwei", "Drei"],
+                on_change=on_list,
+            )
+
+            self.assertTrue(bool(user32.IsWindow(combo.hwnd)))
+            self.assertTrue(bool(user32.IsWindow(lst.hwnd)))
+            self.assertEqual(combo.selected_index, 1)
+            self.assertEqual(combo.selected_text, "Beta")
+
+            combo.selected_index = 2
+            self.assertEqual(combo.selected_text, "Gamma")
+
+            lst.selected_index = 0
+            self.assertEqual(lst.selected_text, "Eins")
+
+            combo_wparam = (CBN_SELCHANGE << 16) | (combo.control_id & 0xFFFF)
+            user32.SendMessageW(win.hwnd, int(WM.COMMAND), combo_wparam, combo.hwnd)
+            self.assertEqual(combo_events[-1], (2, "Gamma"))
+
+            list_wparam = (LBN_SELCHANGE << 16) | (lst.control_id & 0xFFFF)
+            user32.SendMessageW(win.hwnd, int(WM.COMMAND), list_wparam, lst.hwnd)
+            self.assertEqual(list_events[-1], (0, "Eins"))
+
+            combo.clear()
+            self.assertIsNone(combo.selected_text)
+            lst.clear()
+            self.assertIsNone(lst.selected_text)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1,36 +1,96 @@
 """
 barewingui.dialogs
 ~~~~~~~~~~~~~~~~~~
-Complete, zero-dependency Win32 system dialog wrappers.
-Covers all native modal dialogs without third-party dependencies.
+Deterministic, zero-dependency Win32 system dialogs and modal pickers.
+Wraps user32, comdlg32, and shell32 APIs with native Segoe UI rendering.
 """
 
 from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
-from dataclasses import dataclass
-from typing import Sequence
+from typing import TYPE_CHECKING, Any, Literal
+
+from barewingui.constants import (
+    ShowWindowCmd,
+    StandardID,
+    StockObject,
+    SysColor,
+    WindowStyle,
+    WindowStyleEx,
+    WM,
+)
+from barewingui.core import Application, get_system_font
+from barewingui.types import (
+    COLORREF,
+    HFONT,
+    LPARAM,
+    LRESULT,
+    WPARAM,
+    WNDCLASSEXW,
+    WNDPROC,
+    gdi32,
+    kernel32,
+    user32,
+)
+
+if TYPE_CHECKING:
+    from barewingui.window import Window
 
 # ---------------------------------------------------------------------------
-# DLL-Initialisierung & Basis-Typen
+# DLL-Instanzen für Dialoge
 # ---------------------------------------------------------------------------
-user32 = ctypes.windll.user32
 comdlg32 = ctypes.windll.comdlg32
 shell32 = ctypes.windll.shell32
 ole32 = ctypes.windll.ole32
-kernel32 = ctypes.windll.kernel32
-gdi32 = ctypes.windll.gdi32
-
-MAX_PATH = 260
-LF_FACESIZE = 32
-COLORREF = wintypes.DWORD
-LRESULT = ctypes.c_int64
-WNDPROC = ctypes.WINFUNCTYPE(LRESULT, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
 
 # ---------------------------------------------------------------------------
-# Win32 C-Strukturen (64-Bit ABI Alignment)
+# MessageBox Konstanten & Typen
 # ---------------------------------------------------------------------------
+MB_OK = 0x00000000
+MB_OKCANCEL = 0x00000001
+MB_ABORTRETRYIGNORE = 0x00000002
+MB_YESNOCANCEL = 0x00000003
+MB_YESNO = 0x00000004
+MB_RETRYCANCEL = 0x00000005
+
+MB_ICONERROR = 0x00000010
+MB_ICONQUESTION = 0x00000020
+MB_ICONWARNING = 0x00000030
+MB_ICONINFORMATION = 0x00000040
+
+user32.MessageBoxW.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT]
+user32.MessageBoxW.restype = ctypes.c_int
+
+user32.IsWindow.argtypes = [wintypes.HWND]
+user32.IsWindow.restype = wintypes.BOOL
+
+user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+user32.GetWindowTextW.restype = ctypes.c_int
+
+user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+user32.GetWindowTextLengthW.restype = ctypes.c_int
+
+# ---------------------------------------------------------------------------
+# Common Dialog C-Strukturen & Flags
+# ---------------------------------------------------------------------------
+OFN_OVERWRITEPROMPT = 0x00000002
+OFN_FILEMUSTEXIST = 0x00001000
+OFN_PATHMUSTEXIST = 0x00000800
+OFN_EXPLORER = 0x00080000
+OFN_ENABLESIZING = 0x00800000
+
+CC_RGBINIT = 0x00000001
+CC_FULLOPEN = 0x00000002
+
+CF_SCREENFONTS = 0x00000001
+CF_EFFECTS = 0x00000100
+CF_INITTOLOGFONTSTRUCT = 0x00000040
+
+BIF_RETURNONLYFSDIRS = 0x00000001
+BIF_NEWDIALOGSTYLE = 0x00000040
+
+
 class OPENFILENAMEW(ctypes.Structure):
     _fields_ = [
         ("lStructSize", wintypes.DWORD),
@@ -50,25 +110,14 @@ class OPENFILENAMEW(ctypes.Structure):
         ("nFileOffset", wintypes.WORD),
         ("nFileExtension", wintypes.WORD),
         ("lpstrDefExt", wintypes.LPCWSTR),
-        ("lCustData", wintypes.LPARAM),
-        ("lpfnHook", wintypes.LPVOID),
+        ("lCustData", LPARAM),
+        ("lpfnHook", ctypes.c_void_p),
         ("lpTemplateName", wintypes.LPCWSTR),
-        ("pvReserved", wintypes.LPVOID),
+        ("pvReserved", ctypes.c_void_p),
         ("dwReserved", wintypes.DWORD),
         ("FlagsEx", wintypes.DWORD),
     ]
 
-class BROWSEINFOW(ctypes.Structure):
-    _fields_ = [
-        ("hwndOwner", wintypes.HWND),
-        ("pidlRoot", wintypes.LPVOID),
-        ("pszDisplayName", wintypes.LPWSTR),
-        ("lpszTitle", wintypes.LPCWSTR),
-        ("ulFlags", wintypes.UINT),
-        ("lpfn", wintypes.LPVOID),
-        ("lParam", wintypes.LPARAM),
-        ("iImage", ctypes.c_int),
-    ]
 
 class CHOOSECOLORW(ctypes.Structure):
     _fields_ = [
@@ -78,10 +127,11 @@ class CHOOSECOLORW(ctypes.Structure):
         ("rgbResult", COLORREF),
         ("lpCustColors", ctypes.POINTER(COLORREF)),
         ("Flags", wintypes.DWORD),
-        ("lCustData", wintypes.LPARAM),
-        ("lpfnHook", wintypes.LPVOID),
+        ("lCustData", LPARAM),
+        ("lpfnHook", ctypes.c_void_p),
         ("lpTemplateName", wintypes.LPCWSTR),
     ]
+
 
 class LOGFONTW(ctypes.Structure):
     _fields_ = [
@@ -98,8 +148,9 @@ class LOGFONTW(ctypes.Structure):
         ("lfClipPrecision", wintypes.BYTE),
         ("lfQuality", wintypes.BYTE),
         ("lfPitchAndFamily", wintypes.BYTE),
-        ("lfFaceName", wintypes.WCHAR * LF_FACESIZE),
+        ("lfFaceName", wintypes.WCHAR * 32),
     ]
+
 
 class CHOOSEFONTW(ctypes.Structure):
     _fields_ = [
@@ -107,129 +158,35 @@ class CHOOSEFONTW(ctypes.Structure):
         ("hwndOwner", wintypes.HWND),
         ("hDC", wintypes.HDC),
         ("lpLogFont", ctypes.POINTER(LOGFONTW)),
-        ("iPointSize", wintypes.INT),
+        ("iPointSize", ctypes.c_int),
         ("Flags", wintypes.DWORD),
         ("rgbColors", COLORREF),
-        ("lCustData", wintypes.LPARAM),
-        ("lpfnHook", wintypes.LPVOID),
+        ("lCustData", LPARAM),
+        ("lpfnHook", ctypes.c_void_p),
         ("lpTemplateName", wintypes.LPCWSTR),
         ("hInstance", wintypes.HINSTANCE),
         ("lpszStyle", wintypes.LPWSTR),
         ("nFontType", wintypes.WORD),
-        ("___MISSING_ALIGNMENT", wintypes.WORD),
-        ("nSizeMin", wintypes.INT),
-        ("nSizeMax", wintypes.INT),
+        ("wReserved", wintypes.WORD),
+        ("nSizeMin", ctypes.c_int),
+        ("nSizeMax", ctypes.c_int),
     ]
 
-class PRINTDLGW(ctypes.Structure):
+
+class BROWSEINFOW(ctypes.Structure):
     _fields_ = [
-        ("lStructSize", wintypes.DWORD),
         ("hwndOwner", wintypes.HWND),
-        ("hDevMode", wintypes.HGLOBAL),
-        ("hDevNames", wintypes.HGLOBAL),
-        ("hDC", wintypes.HDC),
-        ("Flags", wintypes.DWORD),
-        ("nFromPage", wintypes.WORD),
-        ("nToPage", wintypes.WORD),
-        ("nMinPage", wintypes.WORD),
-        ("nMaxPage", wintypes.WORD),
-        ("nCopies", wintypes.WORD),
-        ("hInstance", wintypes.HINSTANCE),
-        ("lCustData", wintypes.LPARAM),
-        ("lpfnPrintHook", wintypes.LPVOID),
-        ("lpfnSetupHook", wintypes.LPVOID),
-        ("lpPrintTemplateName", wintypes.LPCWSTR),
-        ("lpSetupTemplateName", wintypes.LPCWSTR),
-        ("hPrintTemplate", wintypes.HGLOBAL),
-        ("hSetupTemplate", wintypes.HGLOBAL),
+        ("pidlRoot", ctypes.c_void_p),
+        ("pszDisplayName", wintypes.LPWSTR),
+        ("lpszTitle", wintypes.LPCWSTR),
+        ("ulFlags", wintypes.UINT),
+        ("lpfn", ctypes.c_void_p),
+        ("lParam", LPARAM),
+        ("iImage", ctypes.c_int),
     ]
 
-class PAGESETUPDLGW(ctypes.Structure):
-    _fields_ = [
-        ("lStructSize", wintypes.DWORD),
-        ("hwndOwner", wintypes.HWND),
-        ("hDevMode", wintypes.HGLOBAL),
-        ("hDevNames", wintypes.HGLOBAL),
-        ("Flags", wintypes.DWORD),
-        ("ptPaperSize", wintypes.POINT),
-        ("rtMinMargin", wintypes.RECT),
-        ("rtMargin", wintypes.RECT),
-        ("hInstance", wintypes.HINSTANCE),
-        ("lCustData", wintypes.LPARAM),
-        ("lpfnPageSetupHook", wintypes.LPVOID),
-        ("lpfnPagePaintHook", wintypes.LPVOID),
-        ("lpPageSetupTemplateName", wintypes.LPCWSTR),
-        ("hPageSetupTemplate", wintypes.HGLOBAL),
-    ]
 
-class WNDCLASSEXW(ctypes.Structure):
-    _fields_ = [
-        ("cbSize", wintypes.UINT),
-        ("style", wintypes.UINT),
-        ("lpfnWndProc", WNDPROC),
-        ("cbClsExtra", ctypes.c_int),
-        ("cbWndExtra", ctypes.c_int),
-        ("hInstance", wintypes.HINSTANCE),
-        ("hIcon", wintypes.HICON),
-        ("hCursor", wintypes.HANDLE),
-        ("hbrBackground", wintypes.HANDLE),
-        ("lpszMenuName", wintypes.LPCWSTR),
-        ("lpszClassName", wintypes.LPCWSTR),
-        ("hIconSm", wintypes.HICON),
-    ]
-
-# ---------------------------------------------------------------------------
-# C-Signaturen deklarieren (Explizite 64-Bit-Typensicherheit)
-# ---------------------------------------------------------------------------
-user32.MessageBoxW.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT]
-user32.MessageBoxW.restype = ctypes.c_int
-
-user32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
-user32.DefWindowProcW.restype = LRESULT
-
-user32.CreateWindowExW.argtypes = [
-    wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD,
-    ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
-    wintypes.HWND, wintypes.HMENU, wintypes.HINSTANCE, wintypes.LPVOID
-]
-user32.CreateWindowExW.restype = wintypes.HWND
-
-user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
-user32.SendMessageW.restype = LRESULT
-
-user32.DestroyWindow.argtypes = [wintypes.HWND]
-user32.DestroyWindow.restype = wintypes.BOOL
-
-user32.PostQuitMessage.argtypes = [ctypes.c_int]
-user32.PostQuitMessage.restype = None
-
-user32.EnableWindow.argtypes = [wintypes.HWND, wintypes.BOOL]
-user32.EnableWindow.restype = wintypes.BOOL
-
-user32.SetForegroundWindow.argtypes = [wintypes.HWND]
-user32.SetForegroundWindow.restype = wintypes.BOOL
-
-user32.RegisterClassExW.argtypes = [ctypes.POINTER(WNDCLASSEXW)]
-user32.RegisterClassExW.restype = wintypes.ATOM
-
-user32.UnregisterClassW.argtypes = [wintypes.LPCWSTR, wintypes.HINSTANCE]
-user32.UnregisterClassW.restype = wintypes.BOOL
-
-user32.LoadCursorW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR]
-user32.LoadCursorW.restype = wintypes.HANDLE
-
-user32.GetSystemMetrics.argtypes = [ctypes.c_int]
-user32.GetSystemMetrics.restype = ctypes.c_int
-
-user32.GetMessageW.argtypes = [ctypes.POINTER(wintypes.MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT]
-user32.GetMessageW.restype = wintypes.BOOL
-
-user32.TranslateMessage.argtypes = [ctypes.POINTER(wintypes.MSG)]
-user32.TranslateMessage.restype = wintypes.BOOL
-
-user32.DispatchMessageW.argtypes = [ctypes.POINTER(wintypes.MSG)]
-user32.DispatchMessageW.restype = LRESULT
-
+# Signaturen verankern
 comdlg32.GetOpenFileNameW.argtypes = [ctypes.POINTER(OPENFILENAMEW)]
 comdlg32.GetOpenFileNameW.restype = wintypes.BOOL
 
@@ -242,438 +199,536 @@ comdlg32.ChooseColorW.restype = wintypes.BOOL
 comdlg32.ChooseFontW.argtypes = [ctypes.POINTER(CHOOSEFONTW)]
 comdlg32.ChooseFontW.restype = wintypes.BOOL
 
-comdlg32.PrintDlgW.argtypes = [ctypes.POINTER(PRINTDLGW)]
-comdlg32.PrintDlgW.restype = wintypes.BOOL
-
-comdlg32.PageSetupDlgW.argtypes = [ctypes.POINTER(PAGESETUPDLGW)]
-comdlg32.PageSetupDlgW.restype = wintypes.BOOL
-
 shell32.SHBrowseForFolderW.argtypes = [ctypes.POINTER(BROWSEINFOW)]
-shell32.SHBrowseForFolderW.restype = wintypes.LPVOID
+shell32.SHBrowseForFolderW.restype = ctypes.c_void_p
 
-shell32.SHGetPathFromIDListW.argtypes = [wintypes.LPVOID, wintypes.LPWSTR]
+shell32.SHGetPathFromIDListW.argtypes = [ctypes.c_void_p, wintypes.LPWSTR]
 shell32.SHGetPathFromIDListW.restype = wintypes.BOOL
 
-shell32.ShellAboutW.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.HICON]
-shell32.ShellAboutW.restype = ctypes.c_int
-
-gdi32.GetStockObject.argtypes = [ctypes.c_int]
-gdi32.GetStockObject.restype = wintypes.HGDIOBJ
-
-gdi32.DeleteDC.argtypes = [wintypes.HDC]
-gdi32.DeleteDC.restype = wintypes.BOOL
-
-kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
-kernel32.GetModuleHandleW.restype = wintypes.HINSTANCE
-
-ole32.CoTaskMemFree.argtypes = [wintypes.LPVOID]
+ole32.CoTaskMemFree.argtypes = [ctypes.c_void_p]
 ole32.CoTaskMemFree.restype = None
 
-kernel32.GlobalFree.argtypes = [wintypes.HGLOBAL]
-kernel32.GlobalFree.restype = wintypes.HGLOBAL
-
+# Globale Farb-Palette für den Farbdialog (16 benutzerdefinierte Farben)
 _CUSTOM_COLORS = (COLORREF * 16)()
 
-# ---------------------------------------------------------------------------
-# Datenklassen für Rückgabewerte
-# ---------------------------------------------------------------------------
-@dataclass(slots=True, frozen=True)
-class FontSelection:
-    name: str
-    size_pt: float
-    weight: int
-    italic: bool
-    underline: bool
-    strikeout: bool
-    color: tuple[int, int, int]
 
-@dataclass(slots=True, frozen=True)
-class PrintSelection:
-    copies: int
-    from_page: int
-    to_page: int
-    all_pages: bool
-    selection_only: bool
+def _to_lresult(value: object) -> int:
+    """ctypes-WNDPROC darf nur einen Python-int zurückgeben."""
+    if value is None:
+        return 0
+    if isinstance(value, int):
+        return value
+    raw = getattr(value, "value", value)
+    if raw is None:
+        return 0
+    return raw if isinstance(raw, int) else int(raw)
 
-@dataclass(slots=True, frozen=True)
-class PageSetupSelection:
-    width_mm: float
-    height_mm: float
-    margin_left_mm: float
-    margin_top_mm: float
-    margin_right_mm: float
-    margin_bottom_mm: float
 
-# ---------------------------------------------------------------------------
-# Hilfsfunktionen
-# ---------------------------------------------------------------------------
-def _format_filters(filters: Sequence[tuple[str, str]]) -> str:
-    parts = []
-    for label, pattern in filters:
-        parts.append(label)
-        parts.append(pattern)
+def _hwnd_key(hwnd: object) -> int:
+    if hwnd is None:
+        return 0
+    if isinstance(hwnd, int):
+        return hwnd
+    raw = getattr(hwnd, "value", hwnd)
+    return 0 if raw is None else int(raw)
+
+
+def _resolve_hwnd(parent: Window | wintypes.HWND | int | None) -> wintypes.HWND | None:
+    if parent is None:
+        return None
+    if hasattr(parent, "hwnd"):
+        return parent.hwnd
+    return wintypes.HWND(int(parent))
+
+
+def _build_filter_string(filters: list[tuple[str, str]] | None) -> str:
+    if not filters:
+        return "Alle Dateien (*.*)\0*.*\0\0"
+    parts: list[str] = []
+    for desc, pat in filters:
+        parts.append(f"{desc}\0{pat}")
+    parts.append("Alle Dateien (*.*)\0*.*")
     return "\0".join(parts) + "\0\0"
 
-def _colorref_to_rgb(raw: int) -> tuple[int, int, int]:
-    return (raw & 0xFF, (raw >> 8) & 0xFF, (raw >> 16) & 0xFF)
 
-def _rgb_to_colorref(rgb: tuple[int, int, int]) -> int:
-    r, g, b = rgb
-    return (b << 16) | (g << 8) | r
+def _double_null_buffer(text: str) -> ctypes.Array[ctypes.c_wchar]:
+    """Kopiert einen Filterstring inklusive eingebetteter Nullzeichen nach LPCWSTR."""
+    buf = (ctypes.c_wchar * (len(text) + 1))()
+    for i, ch in enumerate(text):
+        buf[i] = ch
+    return buf
+
 
 # ---------------------------------------------------------------------------
-# Die 10 nativen Systemdialoge
+# 1. Universelle MessageBox & Hilfsdialoge (2–5)
 # ---------------------------------------------------------------------------
 def message_box(
-    text: str,
+    message: str,
     title: str = "Hinweis",
-    style: int = 0x00000000,  # MB_OK
-    owner_hwnd: int | None = None
-) -> int:
-    """Zeigt eine native Windows MessageBox an."""
-    return user32.MessageBoxW(owner_hwnd, text, title, style)
+    icon: Literal["info", "warning", "error", "question", "none"] = "info",
+    buttons: Literal["ok", "ok_cancel", "yes_no", "yes_no_cancel", "retry_cancel"] = "ok",
+    parent: Window | wintypes.HWND | int | None = None,
+) -> str:
+    """Zeigt eine native Win32-MessageBox an."""
+    Application.initialize()
+    u_type = 0
+
+    if buttons == "ok":
+        u_type |= MB_OK
+    elif buttons == "ok_cancel":
+        u_type |= MB_OKCANCEL
+    elif buttons == "yes_no":
+        u_type |= MB_YESNO
+    elif buttons == "yes_no_cancel":
+        u_type |= MB_YESNOCANCEL
+    elif buttons == "retry_cancel":
+        u_type |= MB_RETRYCANCEL
+
+    if icon == "info":
+        u_type |= MB_ICONINFORMATION
+    elif icon == "warning":
+        u_type |= MB_ICONWARNING
+    elif icon == "error":
+        u_type |= MB_ICONERROR
+    elif icon == "question":
+        u_type |= MB_ICONQUESTION
+
+    hwnd_owner = _resolve_hwnd(parent)
+    result = user32.MessageBoxW(hwnd_owner, message, title, u_type)
+
+    mapping = {
+        int(StandardID.OK): "ok",
+        int(StandardID.CANCEL): "cancel",
+        int(StandardID.YES): "yes",
+        int(StandardID.NO): "no",
+        int(StandardID.RETRY): "retry",
+    }
+    return mapping.get(result, "cancel")
 
 
+def info_box(message: str, title: str = "Information", parent: Window | wintypes.HWND | int | None = None) -> None:
+    """Zeigt eine native Informations-Meldung (OK) an."""
+    message_box(message, title=title, icon="info", buttons="ok", parent=parent)
+
+
+def warning_box(message: str, title: str = "Warnung", parent: Window | wintypes.HWND | int | None = None) -> None:
+    """Zeigt eine Warnungsmeldung (OK) an."""
+    message_box(message, title=title, icon="warning", buttons="ok", parent=parent)
+
+
+def error_box(message: str, title: str = "Fehler", parent: Window | wintypes.HWND | int | None = None) -> None:
+    """Zeigt eine Fehlermeldung (OK) an."""
+    message_box(message, title=title, icon="error", buttons="ok", parent=parent)
+
+
+def confirm_box(message: str, title: str = "Bestätigung", parent: Window | wintypes.HWND | int | None = None) -> bool:
+    """Zeigt einen Ja/Nein-Bestätigungsdialog an. Gibt True bei 'Ja' zurück."""
+    return message_box(message, title=title, icon="question", buttons="yes_no", parent=parent) == "yes"
+
+
+ask_yes_no = confirm_box
+
+
+# ---------------------------------------------------------------------------
+# 6. Modal InputBox (Eigenständiges leichtgewichtiges Win32-Fenster)
+# ---------------------------------------------------------------------------
+_INPUT_BOX_CLASS = "BareWinGUI_InputBox"
+_input_class_registered = False
+_input_sessions: dict[int, dict[str, Any]] = {}
+
+
+def _input_proc(hwnd: wintypes.HWND, msg: int, wparam: WPARAM, lparam: LPARAM) -> int:
+    session = _input_sessions.get(_hwnd_key(hwnd))
+
+    if msg == int(WM.CTLCOLORSTATIC):
+        hdc = wintypes.HDC(wparam)
+        gdi32.SetBkMode(hdc, 1)
+        brush = user32.GetSysColorBrush(int(SysColor.WINDOW))
+        return _to_lresult(brush)
+
+    if session is None:
+        return _to_lresult(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
+
+    controls: dict[str, wintypes.HWND] = session["controls"]
+    result_text: list[str | None] = session["result"]
+
+    if msg == int(WM.COMMAND):
+        ctrl_id = int(wparam) & 0xFFFF
+        if ctrl_id == int(StandardID.OK):
+            edit_h = controls.get("edit")
+            if edit_h:
+                length = user32.GetWindowTextLengthW(edit_h)
+                buf = ctypes.create_unicode_buffer(length + 1)
+                user32.GetWindowTextW(edit_h, buf, length + 1)
+                result_text[0] = buf.value
+            user32.DestroyWindow(hwnd)
+            return 0
+        if ctrl_id == int(StandardID.CANCEL):
+            result_text[0] = None
+            user32.DestroyWindow(hwnd)
+            return 0
+
+    elif msg == int(WM.CLOSE):
+        result_text[0] = None
+        user32.DestroyWindow(hwnd)
+        return 0
+
+    return _to_lresult(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
+
+
+# Dauerhafte Referenz hält den C-Funktionszeiger gegen GC-Löschung
+_input_wndproc_anchor: WNDPROC = WNDPROC(_input_proc)
+
+
+def input_box(
+    prompt: str,
+    title: str = "Eingabe",
+    default: str = "",
+    password: bool = False,
+    parent: Window | wintypes.HWND | int | None = None,
+) -> str | None:
+    """
+    Öffnet einen modalen Eingabedialog mit Segoe UI Typografie.
+    Gibt den eingegebenen String zurück oder None bei Abbruch/Schließen.
+    """
+    Application.initialize()
+    global _input_class_registered
+
+    h_instance = kernel32.GetModuleHandleW(None)
+    owner_hwnd = _resolve_hwnd(parent)
+
+    result_text: list[str | None] = [None]
+    controls: dict[str, wintypes.HWND] = {}
+
+    # Einmalige Registrierung der Fensterklasse für InputBoxes
+    if not _input_class_registered:
+        wcex = WNDCLASSEXW()
+        wcex.cbSize = ctypes.sizeof(WNDCLASSEXW)
+        wcex.style = 0
+        wcex.lpfnWndProc = _input_wndproc_anchor
+        wcex.hInstance = h_instance
+        wcex.hCursor = user32.LoadCursorW(None, ctypes.c_wchar_p(32512))
+        wcex.hbrBackground = user32.GetSysColorBrush(int(SysColor.WINDOW))
+        wcex.lpszClassName = _INPUT_BOX_CLASS
+        atom = user32.RegisterClassExW(ctypes.byref(wcex))
+        if not atom:
+            err = kernel32.GetLastError()
+            # 1410 = ERROR_CLASS_ALREADY_EXISTS
+            if err != 1410:
+                raise RuntimeError(f"Konnte InputBox-Klasse nicht registrieren (Fehler {err})")
+        _input_class_registered = True
+
+    # Maße und Zentrierung
+    dlg_w, dlg_h = 420, 180
+    screen_w = user32.GetSystemMetrics(0)
+    screen_h = user32.GetSystemMetrics(1)
+    x = max(0, (screen_w - dlg_w) // 2)
+    y = max(0, (screen_h - dlg_h) // 2)
+
+    if owner_hwnd:
+        user32.EnableWindow(owner_hwnd, False)
+
+    dlg_style = int(WindowStyle.POPUPWINDOW | WindowStyle.CAPTION | WindowStyle.VISIBLE)
+    dlg_ex_style = int(WindowStyleEx.DLGMODALFRAME | WindowStyleEx.TOPMOST)
+
+    hwnd_dlg = user32.CreateWindowExW(
+        dlg_ex_style,
+        _INPUT_BOX_CLASS,
+        title,
+        dlg_style,
+        x,
+        y,
+        dlg_w,
+        dlg_h,
+        owner_hwnd,
+        None,
+        h_instance,
+        None,
+    )
+
+    if not hwnd_dlg:
+        if owner_hwnd:
+            user32.EnableWindow(owner_hwnd, True)
+        raise RuntimeError(
+            f"Konnte InputBox nicht erzeugen (Fehler {kernel32.GetLastError()})"
+        )
+
+    session_key = _hwnd_key(hwnd_dlg)
+    _input_sessions[session_key] = {"controls": controls, "result": result_text}
+
+    try:
+        sys_font = get_system_font()
+
+        # Prompt Label
+        lbl_hwnd = user32.CreateWindowExW(
+            0,
+            "STATIC",
+            prompt,
+            int(WindowStyle.CHILD | WindowStyle.VISIBLE),
+            20,
+            18,
+            365,
+            38,
+            hwnd_dlg,
+            None,
+            h_instance,
+            None,
+        )
+        user32.SendMessageW(lbl_hwnd, int(WM.SETFONT), sys_font, 1)
+
+        # Eingabefeld
+        edit_style = int(WindowStyle.CHILD | WindowStyle.VISIBLE | WindowStyle.TABSTOP) | 0x0080  # ES_AUTOHSCROLL
+        if password:
+            edit_style |= 0x0020  # ES_PASSWORD
+
+        edit_hwnd = user32.CreateWindowExW(
+            int(WindowStyleEx.CLIENTEDGE),
+            "EDIT",
+            default,
+            edit_style,
+            20,
+            62,
+            365,
+            26,
+            hwnd_dlg,
+            None,
+            h_instance,
+            None,
+        )
+        controls["edit"] = edit_hwnd
+        user32.SendMessageW(edit_hwnd, int(WM.SETFONT), sys_font, 1)
+
+        # OK Button
+        ok_hwnd = user32.CreateWindowExW(
+            0,
+            "BUTTON",
+            "OK",
+            int(WindowStyle.CHILD | WindowStyle.VISIBLE | WindowStyle.TABSTOP) | 0x0001,  # BS_DEFPUSHBUTTON
+            205,
+            102,
+            85,
+            28,
+            hwnd_dlg,
+            wintypes.HMENU(int(StandardID.OK)),
+            h_instance,
+            None,
+        )
+        user32.SendMessageW(ok_hwnd, int(WM.SETFONT), sys_font, 1)
+
+        # Abbrechen Button
+        cancel_hwnd = user32.CreateWindowExW(
+            0,
+            "BUTTON",
+            "Abbrechen",
+            int(WindowStyle.CHILD | WindowStyle.VISIBLE | WindowStyle.TABSTOP),
+            298,
+            102,
+            87,
+            28,
+            hwnd_dlg,
+            wintypes.HMENU(int(StandardID.CANCEL)),
+            h_instance,
+            None,
+        )
+        user32.SendMessageW(cancel_hwnd, int(WM.SETFONT), sys_font, 1)
+
+        user32.SetFocus(edit_hwnd)
+        user32.SendMessageW(edit_hwnd, 0x00B1, 0, -1)  # EM_SETSEL: Alles markieren
+
+        # Modale Message-Schleife
+        msg = wintypes.MSG()
+        p_msg = ctypes.byref(msg)
+
+        while user32.IsWindow(hwnd_dlg) and user32.GetMessageW(p_msg, None, 0, 0) > 0:
+            # Enter- und Escape-Taste abfangen
+            if msg.message == int(WM.KEYDOWN):
+                if msg.wParam == 0x0D:  # VK_RETURN
+                    user32.SendMessageW(hwnd_dlg, int(WM.COMMAND), int(StandardID.OK), ok_hwnd)
+                    continue
+                if msg.wParam == 0x1B:  # VK_ESCAPE
+                    user32.SendMessageW(hwnd_dlg, int(WM.COMMAND), int(StandardID.CANCEL), cancel_hwnd)
+                    continue
+
+            user32.TranslateMessage(p_msg)
+            user32.DispatchMessageW(p_msg)
+    finally:
+        _input_sessions.pop(session_key, None)
+        if owner_hwnd:
+            user32.EnableWindow(owner_hwnd, True)
+            user32.SetForegroundWindow(owner_hwnd)
+
+    return result_text[0]
+
+
+# ---------------------------------------------------------------------------
+# 7. Datei öffnen (GetOpenFileNameW)
+# ---------------------------------------------------------------------------
 def open_file(
     title: str = "Datei öffnen",
-    initial_dir: str | None = None,
-    filters: Sequence[tuple[str, str]] = (("Alle Dateien (*.*)", "*.*"),),
-    allow_multi: bool = False,
-    owner_hwnd: int | None = None
-) -> str | list[str] | None:
-    """Öffnet den nativen Dateiauswahl-Dialog (GetOpenFileNameW)."""
-    buf_size = 65536 if allow_multi else MAX_PATH
-    buffer = ctypes.create_unicode_buffer(buf_size)
-
-    flags = 0x00001000 | 0x00000800 | 0x00080000  # OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_EXPLORER
-    if allow_multi:
-        flags |= 0x00000200  # OFN_ALLOWMULTISELECT
+    default_dir: str = "",
+    filters: list[tuple[str, str]] | None = None,
+    parent: Window | wintypes.HWND | int | None = None,
+) -> str | None:
+    """Öffnet den Explorer-Dateiauswahldialog."""
+    Application.initialize()
+    buffer = ctypes.create_unicode_buffer(65536)
+    filter_buf = _double_null_buffer(_build_filter_string(filters))
 
     ofn = OPENFILENAMEW()
     ofn.lStructSize = ctypes.sizeof(OPENFILENAMEW)
-    ofn.hwndOwner = owner_hwnd
-    ofn.lpstrFilter = _format_filters(filters)
+    owner = _resolve_hwnd(parent)
+    if owner:
+        ofn.hwndOwner = owner
+    ofn.lpstrFilter = ctypes.cast(filter_buf, wintypes.LPCWSTR)
     ofn.lpstrFile = ctypes.cast(buffer, wintypes.LPWSTR)
-    ofn.nMaxFile = buf_size
-    ofn.lpstrInitialDir = initial_dir
+    ofn.nMaxFile = 65536
+    ofn.lpstrInitialDir = default_dir or None
     ofn.lpstrTitle = title
-    ofn.Flags = flags
+    ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_ENABLESIZING
 
     if comdlg32.GetOpenFileNameW(ctypes.byref(ofn)):
-        if allow_multi:
-            raw = buffer.raw.decode("utf-16le")
-            parts = [p for p in raw.split("\0") if p]
-            if len(parts) == 1:
-                return parts[0]
-            folder = parts[0]
-            return [f"{folder}\\{name}" for name in parts[1:]]
         return buffer.value
     return None
 
 
+# ---------------------------------------------------------------------------
+# 8. Datei speichern (GetSaveFileNameW)
+# ---------------------------------------------------------------------------
 def save_file(
     title: str = "Datei speichern",
+    default_dir: str = "",
     default_name: str = "",
     default_ext: str = "",
-    initial_dir: str | None = None,
-    filters: Sequence[tuple[str, str]] = (("Alle Dateien (*.*)", "*.*"),),
-    overwrite_prompt: bool = True,
-    owner_hwnd: int | None = None
+    filters: list[tuple[str, str]] | None = None,
+    parent: Window | wintypes.HWND | int | None = None,
 ) -> str | None:
-    """Öffnet den nativen Speicherndialog (GetSaveFileNameW)."""
-    buffer = ctypes.create_unicode_buffer(MAX_PATH)
+    """Öffnet den Explorer-Speicherdialog mit Überschreibwarnung."""
+    Application.initialize()
+    buffer = ctypes.create_unicode_buffer(65536)
     if default_name:
         buffer.value = default_name
 
-    flags = 0x00000800 | 0x00080000  # OFN_PATHMUSTEXIST | OFN_EXPLORER
-    if overwrite_prompt:
-        flags |= 0x00000002  # OFN_OVERWRITEPROMPT
+    filter_buf = _double_null_buffer(_build_filter_string(filters))
 
     ofn = OPENFILENAMEW()
     ofn.lStructSize = ctypes.sizeof(OPENFILENAMEW)
-    ofn.hwndOwner = owner_hwnd
-    ofn.lpstrFilter = _format_filters(filters)
+    owner = _resolve_hwnd(parent)
+    if owner:
+        ofn.hwndOwner = owner
+    ofn.lpstrFilter = ctypes.cast(filter_buf, wintypes.LPCWSTR)
     ofn.lpstrFile = ctypes.cast(buffer, wintypes.LPWSTR)
-    ofn.nMaxFile = MAX_PATH
-    ofn.lpstrDefExt = default_ext if default_ext else None
-    ofn.lpstrInitialDir = initial_dir
+    ofn.nMaxFile = 65536
+    ofn.lpstrInitialDir = default_dir or None
     ofn.lpstrTitle = title
-    ofn.Flags = flags
+    ofn.lpstrDefExt = default_ext or None
+    ofn.Flags = OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_ENABLESIZING
 
     if comdlg32.GetSaveFileNameW(ctypes.byref(ofn)):
         return buffer.value
     return None
 
 
-def select_folder(
+# ---------------------------------------------------------------------------
+# 9. Ordner auswählen (SHBrowseForFolderW)
+# ---------------------------------------------------------------------------
+def pick_folder(
     title: str = "Ordner auswählen",
-    owner_hwnd: int | None = None
+    parent: Window | wintypes.HWND | int | None = None,
 ) -> str | None:
-    """Öffnet die native Ordnerauswahl (SHBrowseForFolderW)."""
-    display_name = ctypes.create_unicode_buffer(MAX_PATH)
-    path_buffer = ctypes.create_unicode_buffer(MAX_PATH)
+    """Öffnet den nativen Windows-Ordnerauswahldialog."""
+    Application.initialize()
+    display_buf = ctypes.create_unicode_buffer(260)
 
     bi = BROWSEINFOW()
-    bi.hwndOwner = owner_hwnd
-    bi.pszDisplayName = ctypes.cast(display_name, wintypes.LPWSTR)
+    owner = _resolve_hwnd(parent)
+    if owner:
+        bi.hwndOwner = owner
+    bi.pszDisplayName = ctypes.cast(display_buf, wintypes.LPWSTR)
     bi.lpszTitle = title
-    bi.ulFlags = 0x00000001 | 0x00000040  # BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE
+    bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE
 
     pidl = shell32.SHBrowseForFolderW(ctypes.byref(bi))
-    if pidl:
-        shell32.SHGetPathFromIDListW(pidl, path_buffer)
-        ole32.CoTaskMemFree(pidl)
-        return path_buffer.value
-    return None
+    if not pidl:
+        return None
+
+    path_buf = ctypes.create_unicode_buffer(260)
+    success = shell32.SHGetPathFromIDListW(pidl, path_buf)
+    ole32.CoTaskMemFree(pidl)
+
+    return path_buf.value if success else None
 
 
+select_folder = pick_folder
+
+
+# ---------------------------------------------------------------------------
+# 10. Farb- und Schriftart-Dialoge (ChooseColorW / ChooseFontW)
+# ---------------------------------------------------------------------------
 def choose_color(
-    initial_color: tuple[int, int, int] = (0, 0, 0),
-    full_open: bool = True,
-    owner_hwnd: int | None = None
+    initial_color: tuple[int, int, int] | None = None,
+    parent: Window | wintypes.HWND | int | None = None,
 ) -> tuple[int, int, int] | None:
-    """Öffnet den nativen Farbwähler (ChooseColorW)."""
-    flags = 0x00000001  # CC_RGBINIT
-    if full_open:
-        flags |= 0x00000002  # CC_FULLOPEN
+    """
+    Öffnet die Win32-Farbpalette.
+    Gibt ein (Rot, Grün, Blau) Tupel von 0–255 zurück oder None bei Abbruch.
+    """
+    Application.initialize()
+    rgb_init = 0
+    if initial_color:
+        r, g, b = initial_color
+        rgb_init = (r & 0xFF) | ((g & 0xFF) << 8) | ((b & 0xFF) << 16)
 
     cc = CHOOSECOLORW()
     cc.lStructSize = ctypes.sizeof(CHOOSECOLORW)
-    cc.hwndOwner = owner_hwnd
-    cc.rgbResult = _rgb_to_colorref(initial_color)
-    cc.lpCustColors = _CUSTOM_COLORS
-    cc.Flags = flags
+    owner = _resolve_hwnd(parent)
+    if owner:
+        cc.hwndOwner = owner
+    cc.rgbResult = rgb_init
+    cc.lpCustColors = ctypes.cast(_CUSTOM_COLORS, ctypes.POINTER(COLORREF))
+    cc.Flags = CC_RGBINIT | CC_FULLOPEN
 
     if comdlg32.ChooseColorW(ctypes.byref(cc)):
-        return _colorref_to_rgb(cc.rgbResult)
+        val = int(cc.rgbResult)
+        r = val & 0xFF
+        g = (val >> 8) & 0xFF
+        b = (val >> 16) & 0xFF
+        return (r, g, b)
+
     return None
 
 
 def choose_font(
-    initial_font: str = "Segoe UI",
-    point_size: int = 10,
-    owner_hwnd: int | None = None
-) -> FontSelection | None:
-    """Öffnet den nativen Schriftart-Dialog (ChooseFontW)."""
-    log_font = LOGFONTW()
-    log_font.lfFaceName = initial_font
-    log_font.lfHeight = -int(point_size * 96 / 72)
+    parent: Window | wintypes.HWND | int | None = None,
+) -> dict[str, Any] | None:
+    """
+    Öffnet den Windows-Schriftartendialog.
+    Gibt ein Dict mit Name, Größe (pt), Bold, Italic und Farbe zurück.
+    """
+    Application.initialize()
+    lf = LOGFONTW()
 
     cf = CHOOSEFONTW()
     cf.lStructSize = ctypes.sizeof(CHOOSEFONTW)
-    cf.hwndOwner = owner_hwnd
-    cf.lpLogFont = ctypes.pointer(log_font)
-    cf.Flags = 0x00000001 | 0x00000100 | 0x00000040  # CF_SCREENFONTS | CF_EFFECTS | CF_INITTOLOGFONTSTRUCT
+    owner = _resolve_hwnd(parent)
+    if owner:
+        cf.hwndOwner = owner
+    cf.lpLogFont = ctypes.pointer(lf)
+    cf.Flags = CF_SCREENFONTS | CF_EFFECTS
 
     if comdlg32.ChooseFontW(ctypes.byref(cf)):
-        return FontSelection(
-            name=log_font.lfFaceName,
-            size_pt=cf.iPointSize / 10.0,
-            weight=log_font.lfWeight,
-            italic=bool(log_font.lfItalic),
-            underline=bool(log_font.lfUnderline),
-            strikeout=bool(log_font.lfStrikeOut),
-            color=_colorref_to_rgb(cf.rgbColors),
-        )
+        val = int(cf.rgbColors)
+        r = val & 0xFF
+        g = (val >> 8) & 0xFF
+        b = (val >> 16) & 0xFF
+
+        return {
+            "name": lf.lfFaceName,
+            "size": cf.iPointSize // 10,
+            "bold": lf.lfWeight >= 700,
+            "italic": bool(lf.lfItalic),
+            "underline": bool(lf.lfUnderline),
+            "strikeout": bool(lf.lfStrikeOut),
+            "color": (r, g, b),
+        }
+
     return None
-
-
-def print_dialog(
-    min_page: int = 1,
-    max_page: int = 1,
-    owner_hwnd: int | None = None
-) -> PrintSelection | None:
-    """Öffnet den nativen Druckerauswahl-Dialog (PrintDlgW)."""
-    pd = PRINTDLGW()
-    pd.lStructSize = ctypes.sizeof(PRINTDLGW)
-    pd.hwndOwner = owner_hwnd
-    pd.nMinPage = min_page
-    pd.nMaxPage = max_page
-    pd.nCopies = 1
-    pd.Flags = 0x00000100 | 0x00000004  # PD_RETURNDC | PD_NOSELECTION
-
-    if comdlg32.PrintDlgW(ctypes.byref(pd)):
-        sel = PrintSelection(
-            copies=pd.nCopies,
-            from_page=pd.nFromPage,
-            to_page=pd.nToPage,
-            all_pages=not bool(pd.Flags & 0x00000002),
-            selection_only=bool(pd.Flags & 0x00000001),
-        )
-        if pd.hDevMode:
-            kernel32.GlobalFree(pd.hDevMode)
-        if pd.hDevNames:
-            kernel32.GlobalFree(pd.hDevNames)
-        if pd.hDC:
-            gdi32.DeleteDC(pd.hDC)
-        return sel
-    return None
-
-
-def page_setup(owner_hwnd: int | None = None) -> PageSetupSelection | None:
-    """Öffnet den nativen Seiteneinrichtungs-Dialog (PageSetupDlgW)."""
-    psd = PAGESETUPDLGW()
-    psd.lStructSize = ctypes.sizeof(PAGESETUPDLGW)
-    psd.hwndOwner = owner_hwnd
-    psd.Flags = 0x00000008  # PSD_DEFAULTMINMARGINS
-
-    if comdlg32.PageSetupDlgW(ctypes.byref(psd)):
-        sel = PageSetupSelection(
-            width_mm=psd.ptPaperSize.x / 100.0,
-            height_mm=psd.ptPaperSize.y / 100.0,
-            margin_left_mm=psd.rtMargin.left / 100.0,
-            margin_top_mm=psd.rtMargin.top / 100.0,
-            margin_right_mm=psd.rtMargin.right / 100.0,
-            margin_bottom_mm=psd.rtMargin.bottom / 100.0,
-        )
-        if psd.hDevMode:
-            kernel32.GlobalFree(psd.hDevMode)
-        if psd.hDevNames:
-            kernel32.GlobalFree(psd.hDevNames)
-        return sel
-    return None
-
-
-def about_dialog(
-    app_name: str,
-    other_info: str = "BareWinGUI // Zero-Dependency Architecture",
-    icon_handle: int | None = None,
-    owner_hwnd: int | None = None
-) -> None:
-    """Ruft die native Shell-Info-/About-Box auf (ShellAboutW)."""
-    shell32.ShellAboutW(owner_hwnd, app_name, other_info, icon_handle)
-
-
-def input_box(
-    prompt: str,
-    title: str = "Eingabe",
-    default_value: str = "",
-    owner_hwnd: int | None = None
-) -> str | None:
-    """
-    Erzeugt eine rein native modale Eingabebox (InputBox) ohne Dritt-Frameworks
-    via CreateWindowExW und einer modalen Message-Loop.
-    """
-    result_text: str | None = None
-    h_instance = kernel32.GetModuleHandleW(None)
-    class_name = f"BareWinInputBox_{abs(id(prompt))}"
-
-    # Win32 Stile & IDs
-    WS_POPUPWINDOW = 0x80880000
-    WS_CAPTION = 0x00C00000
-    WS_VISIBLE = 0x10000000
-    WS_CHILD = 0x40000000
-    WS_BORDER = 0x00800000
-    ES_AUTOHSCROLL = 0x0080
-    BS_DEFPUSHBUTTON = 0x0001
-    WM_SETFONT = 0x0030
-    DEFAULT_GUI_FONT = 17
-    ID_OK, ID_CANCEL, ID_EDIT = 1001, 1002, 1003
-
-    hwnd_dlg = None
-    hwnd_edit = None
-
-    def wnd_proc(hwnd, msg, wparam, lparam):
-        nonlocal result_text, hwnd_dlg, hwnd_edit
-        if msg == 0x0111:  # WM_COMMAND
-            cmd_id = wparam & 0xFFFF
-            if cmd_id == ID_OK:
-                buf = ctypes.create_unicode_buffer(1024)
-                user32.SendMessageW(hwnd_edit, 0x000D, 1024, ctypes.addressof(buf))  # WM_GETTEXT
-                result_text = buf.value
-                user32.DestroyWindow(hwnd)
-                return 0
-            elif cmd_id == ID_CANCEL:
-                result_text = None
-                user32.DestroyWindow(hwnd)
-                return 0
-        elif msg == 0x0010:  # WM_CLOSE
-            result_text = None
-            user32.DestroyWindow(hwnd)
-            return 0
-        elif msg == 0x0002:  # WM_DESTROY
-            user32.PostQuitMessage(0)
-            return 0
-        return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
-
-    proc_ptr = WNDPROC(wnd_proc)
-
-    wcex = WNDCLASSEXW()
-    wcex.cbSize = ctypes.sizeof(WNDCLASSEXW)
-    wcex.lpfnWndProc = proc_ptr
-    wcex.hInstance = h_instance
-    wcex.hCursor = user32.LoadCursorW(None, wintypes.LPCWSTR(32512))
-    wcex.hbrBackground = wintypes.HANDLE(5 + 1)  # COLOR_WINDOW + 1
-    wcex.lpszClassName = class_name
-    user32.RegisterClassExW(ctypes.byref(wcex))
-
-    if owner_hwnd:
-        user32.EnableWindow(owner_hwnd, False)
-
-    # Automatische Zentrierung auf dem Bildschirm
-    dlg_w, dlg_h = 440, 185
-    pos_x = max(0, (user32.GetSystemMetrics(0) - dlg_w) // 2)
-    pos_y = max(0, (user32.GetSystemMetrics(1) - dlg_h) // 2)
-
-    hwnd_dlg = user32.CreateWindowExW(
-        0x00010000,  # WS_EX_CONTROLPARENT
-        class_name,
-        title,
-        WS_POPUPWINDOW | WS_CAPTION | WS_VISIBLE,
-        pos_x, pos_y, dlg_w, dlg_h,
-        owner_hwnd, None, h_instance, None
-    )
-
-    # Moderne Standard-Schriftart abrufen
-    h_font = gdi32.GetStockObject(DEFAULT_GUI_FONT)
-
-    # Prompt-Label
-    hwnd_lbl = user32.CreateWindowExW(
-        0, "STATIC", prompt,
-        WS_CHILD | WS_VISIBLE,
-        20, 16, 385, 36,
-        hwnd_dlg, None, h_instance, None
-    )
-    user32.SendMessageW(hwnd_lbl, WM_SETFONT, h_font, 1)
-
-    # Eingabefeld (Edit)
-    hwnd_edit = user32.CreateWindowExW(
-        0x00000200,  # WS_EX_CLIENTEDGE
-        "EDIT", default_value,
-        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-        20, 56, 385, 26,
-        hwnd_dlg, wintypes.HMENU(ID_EDIT), h_instance, None
-    )
-    user32.SendMessageW(hwnd_edit, WM_SETFONT, h_font, 1)
-
-    # Buttons
-    hwnd_btn_ok = user32.CreateWindowExW(
-        0, "BUTTON", "OK",
-        WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-        205, 98, 95, 28,
-        hwnd_dlg, wintypes.HMENU(ID_OK), h_instance, None
-    )
-    user32.SendMessageW(hwnd_btn_ok, WM_SETFONT, h_font, 1)
-
-    hwnd_btn_cancel = user32.CreateWindowExW(
-        0, "BUTTON", "Abbrechen",
-        WS_CHILD | WS_VISIBLE,
-        310, 98, 95, 28,
-        hwnd_dlg, wintypes.HMENU(ID_CANCEL), h_instance, None
-    )
-    user32.SendMessageW(hwnd_btn_cancel, WM_SETFONT, h_font, 1)
-
-    # Modale Message-Loop
-    msg = wintypes.MSG()
-    p_msg = ctypes.byref(msg)
-    while user32.GetMessageW(p_msg, None, 0, 0) > 0:
-        user32.TranslateMessage(p_msg)
-        user32.DispatchMessageW(p_msg)
-
-    # Ressourcen freigeben & Parent reaktivieren
-    if owner_hwnd:
-        user32.EnableWindow(owner_hwnd, True)
-        user32.SetForegroundWindow(owner_hwnd)
-
-    user32.UnregisterClassW(class_name, h_instance)
-    return result_text

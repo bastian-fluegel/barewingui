@@ -51,6 +51,22 @@ def _hiword(val: int) -> int:
     return (val >> 16) & 0xFFFF
 
 
+def _to_lresult(value: object) -> int:
+    """
+    ctypes-WNDPROC darf nur einen Python-int zurückgeben.
+    Ein ctypes-Skalar (z. B. c_longlong / LRESULT) löst
+    „object cannot be interpreted as an integer“ aus.
+    """
+    if value is None:
+        return 0
+    if isinstance(value, int):
+        return value
+    raw = getattr(value, "value", value)
+    if raw is None:
+        return 0
+    return raw if isinstance(raw, int) else int(raw)
+
+
 class Window:
     """
     Kapselt ein natives Win32-Top-Level-Fenster (HWND) inklusive Message-Dispatching,
@@ -192,9 +208,9 @@ class Window:
             Window._active_windows[hwnd] = win
 
         if win is not None:
-            return win._handle_message(hwnd, msg, wparam, lparam)
+            return _to_lresult(win._handle_message(hwnd, msg, wparam, lparam))
 
-        return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+        return _to_lresult(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
 
     def _handle_message(
         self, hwnd: wintypes.HWND, msg: int, wparam: WPARAM, lparam: LPARAM
@@ -244,13 +260,11 @@ class Window:
 
             case WM.CTLCOLORSTATIC:
                 hdc = wintypes.HDC(wparam)
-                # 1 = TRANSPARENT (Hintergrund nicht deckend übermalen)
-                gdi32.SetBkMode(hdc, 1)
-                # Reinen Python-int des Brush-Handles zurückgeben (keine ctypes-Klasse)
+                gdi32.SetBkMode(hdc, 1)  # 1 = TRANSPARENT
                 brush = user32.GetSysColorBrush(int(SysColor.WINDOW))
-                return int(brush) if brush else 0
+                return _to_lresult(brush)
 
-        return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+        return _to_lresult(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
 
     def destroy(self) -> None:
         """Zerstört das native HWND deterministisch (RAII)."""

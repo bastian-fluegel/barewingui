@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from barewingui.controls.base import Control
 from barewingui.controls.button import Button, CheckBox, RadioButton
+from barewingui.controls.choice import ComboBox, ListBox
 from barewingui.controls.text import Label, TextInput
 
 __all__ = [
@@ -17,4 +18,6 @@ __all__ = [
     "RadioButton",
     "Label",
     "TextInput",
+    "ComboBox",
+    "ListBox",
 ]
