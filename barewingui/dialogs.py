@@ -20,7 +20,7 @@ from barewingui.constants import (
     WindowStyleEx,
     WM,
 )
-from barewingui.core import Application, get_system_font
+from barewingui.core import Application, apply_window_chrome, get_system_font
 from barewingui.types import (
     COLORREF,
     HFONT,
@@ -340,11 +340,21 @@ _input_sessions: dict[int, dict[str, Any]] = {}
 def _input_proc(hwnd: wintypes.HWND, msg: int, wparam: WPARAM, lparam: LPARAM) -> int:
     session = _input_sessions.get(_hwnd_key(hwnd))
 
+    if msg == int(WM.ERASEBKGND):
+        from barewingui.theme import erase_background
+
+        if erase_background(hwnd, wintypes.HDC(wparam)):
+            return 1
+
     if msg == int(WM.CTLCOLORSTATIC):
-        hdc = wintypes.HDC(wparam)
-        gdi32.SetBkMode(hdc, 1)
-        brush = user32.GetSysColorBrush(int(SysColor.WINDOW))
-        return _to_lresult(brush)
+        from barewingui.theme import paint_static
+
+        return _to_lresult(paint_static(wintypes.HDC(wparam)))
+
+    if msg == int(WM.CTLCOLOREDIT):
+        from barewingui.theme import paint_edit
+
+        return _to_lresult(paint_edit(wintypes.HDC(wparam)))
 
     if session is None:
         return _to_lresult(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
@@ -408,7 +418,9 @@ def input_box(
         wcex.lpfnWndProc = _input_wndproc_anchor
         wcex.hInstance = h_instance
         wcex.hCursor = user32.LoadCursorW(None, ctypes.c_wchar_p(32512))
-        wcex.hbrBackground = user32.GetSysColorBrush(int(SysColor.WINDOW))
+        from barewingui.theme import window_brush
+
+        wcex.hbrBackground = window_brush() or user32.GetSysColorBrush(int(SysColor.WINDOW))
         wcex.lpszClassName = _INPUT_BOX_CLASS
         atom = user32.RegisterClassExW(ctypes.byref(wcex))
         if not atom:
@@ -455,6 +467,7 @@ def input_box(
 
     session_key = _hwnd_key(hwnd_dlg)
     _input_sessions[session_key] = {"controls": controls, "result": result_text}
+    apply_window_chrome(hwnd_dlg)
 
     try:
         sys_font = get_system_font()
@@ -476,20 +489,22 @@ def input_box(
         )
         user32.SendMessageW(lbl_hwnd, int(WM.SETFONT), sys_font, 1)
 
-        # Eingabefeld
-        edit_style = int(WindowStyle.CHILD | WindowStyle.VISIBLE | WindowStyle.TABSTOP) | 0x0080  # ES_AUTOHSCROLL
+        edit_style = (
+            int(WindowStyle.CHILD | WindowStyle.VISIBLE | WindowStyle.TABSTOP)
+            | 0x0080  # ES_AUTOHSCROLL
+        )
         if password:
             edit_style |= 0x0020  # ES_PASSWORD
 
         edit_hwnd = user32.CreateWindowExW(
-            int(WindowStyleEx.CLIENTEDGE),
+            0,
             "EDIT",
             default,
             edit_style,
             20,
             62,
             365,
-            26,
+            32,
             hwnd_dlg,
             None,
             h_instance,
@@ -497,6 +512,10 @@ def input_box(
         )
         controls["edit"] = edit_hwnd
         user32.SendMessageW(edit_hwnd, int(WM.SETFONT), sys_font, 1)
+        user32.SendMessageW(edit_hwnd, 0x00D3, 0x0001 | 0x0002, (8 << 16) | 8)  # EM_SETMARGINS
+        from barewingui.theme import apply_control_theme
+
+        apply_control_theme(edit_hwnd, "EDIT")
 
         # OK Button
         ok_hwnd = user32.CreateWindowExW(
@@ -507,13 +526,14 @@ def input_box(
             205,
             102,
             85,
-            28,
+            32,
             hwnd_dlg,
             wintypes.HMENU(int(StandardID.OK)),
             h_instance,
             None,
         )
         user32.SendMessageW(ok_hwnd, int(WM.SETFONT), sys_font, 1)
+        apply_control_theme(ok_hwnd, "BUTTON")
 
         # Abbrechen Button
         cancel_hwnd = user32.CreateWindowExW(
@@ -524,13 +544,14 @@ def input_box(
             298,
             102,
             87,
-            28,
+            32,
             hwnd_dlg,
             wintypes.HMENU(int(StandardID.CANCEL)),
             h_instance,
             None,
         )
         user32.SendMessageW(cancel_hwnd, int(WM.SETFONT), sys_font, 1)
+        apply_control_theme(cancel_hwnd, "BUTTON")
 
         user32.SetFocus(edit_hwnd)
         user32.SendMessageW(edit_hwnd, 0x00B1, 0, -1)  # EM_SETSEL: Alles markieren

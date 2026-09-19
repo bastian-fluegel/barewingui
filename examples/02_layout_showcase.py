@@ -20,7 +20,7 @@ def main() -> int:
     root = VBox(padding=16, spacing=12)
 
     root.add(Label(win, text="Target Hostname / IP-Adresse:", size=(0, 20)))
-    root.add(TextInput(win, text="10.0.0.1", size=(0, 26)))
+    root.add(TextInput(win, text="10.0.0.1", size=(0, 32)))
 
     root.add(Label(win, text="Erweiterte Notizen & Protokoll:", size=(0, 20)))
 

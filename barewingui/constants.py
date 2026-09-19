@@ -213,6 +213,11 @@ class EditMessage(IntEnum):
     CANUNDO = 0x00C6
     UNDO = 0x00C7
     SETREADONLY = 0x00CF
+    SETMARGINS = 0x00D3
+
+
+EC_LEFTMARGIN = 0x0001
+EC_RIGHTMARGIN = 0x0002
 
 
 class ButtonNotification(IntEnum):

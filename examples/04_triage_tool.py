@@ -49,8 +49,8 @@ def main() -> int:
     # -----------------------------------------------------------------------
     root.add(Label(win, text="Zielpfad / Evidenzquelle:"))
 
-    target_bar = HBox(spacing=8, padding=0, fixed_size=28)
-    target_input = TextInput(win, text=os.getcwd(), size=(0, 26))
+    target_bar = HBox(spacing=8, padding=0, fixed_size=32)
+    target_input = TextInput(win, text=os.getcwd(), size=(0, 32))
     target_bar.add(target_input, stretch=1)
 
     def on_pick_folder() -> None:
@@ -70,14 +70,14 @@ def main() -> int:
         if file_path:
             target_input.text = file_path
 
-    target_bar.add(Button(win, text="Ordner...", size=(90, 26), on_click=on_pick_folder))
-    target_bar.add(Button(win, text="Datei...", size=(80, 26), on_click=on_pick_file))
+    target_bar.add(Button(win, text="Ordner...", size=(90, 32), on_click=on_pick_folder))
+    target_bar.add(Button(win, text="Datei...", size=(80, 32), on_click=on_pick_file))
     root.add(target_bar)
 
     # -----------------------------------------------------------------------
     # 2. Prüfprofil & Ausführung
     # -----------------------------------------------------------------------
-    profile_bar = HBox(spacing=8, padding=0, fixed_size=28)
+    profile_bar = HBox(spacing=8, padding=0, fixed_size=32)
     profile_bar.add(Label(win, text="Triage-Profil:", size=(85, 20)))
 
     profiles = [
@@ -86,10 +86,10 @@ def main() -> int:
         "MFT & Prefetch Auswertung",
         "Kritische Windows EventLogs (Security / Sysmon)",
     ]
-    profile_combo = ComboBox(win, items=profiles, size=(380, 26))
+    profile_combo = ComboBox(win, items=profiles, size=(380, 32))
     profile_bar.add(profile_combo, stretch=1)
 
-    btn_scan = Button(win, text="Triage starten", size=(130, 26), default=True)
+    btn_scan = Button(win, text="Triage starten", size=(130, 32), default=True)
     profile_bar.add(btn_scan)
     root.add(profile_bar)
 

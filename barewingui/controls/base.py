@@ -82,6 +82,7 @@ class Control:
 
         self._create_native_control(native_style, ex_style)
         self._apply_default_font()
+        self._apply_control_theme()
 
     @property
     def hwnd(self) -> wintypes.HWND:
@@ -178,6 +179,13 @@ class Control:
             )
 
         self._hwnd = hwnd
+
+    def _apply_control_theme(self) -> None:
+        if not self._hwnd:
+            return
+        from barewingui.theme import apply_control_theme
+
+        apply_control_theme(self._hwnd, self._WIN32_CLASS)
 
     def _apply_default_font(self) -> None:
         if not self._hwnd:

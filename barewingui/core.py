@@ -16,9 +16,14 @@ from typing import TYPE_CHECKING, ClassVar
 
 from barewingui.types import (
     ACTCTXW,
+    DWMWA_USE_IMMERSIVE_DARK_MODE,
+    DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
+    DWMWA_WINDOW_CORNER_PREFERENCE,
+    DWMWCP_ROUND,
     GA_ROOT,
     INITCOMMONCONTROLSEX,
     ULONG_PTR,
+    dwmapi,
     gdi32,
     kernel32,
     load_comctl32,
@@ -65,11 +70,11 @@ _MANIFEST_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 
 def get_system_font() -> wintypes.HANDLE:
-    """Erzeugt die offizielle Windows 10/11 Segoe UI Schriftart mit ClearType-Glättung."""
+    """Erzeugt Segoe UI Variable (Win11) bzw. Segoe UI mit ClearType-Glättung."""
     global _SYSTEM_FONT
     if _SYSTEM_FONT is None:
         _SYSTEM_FONT = gdi32.CreateFontW(
-            -12,                    # Höhe (entspricht ca. 9pt bei Standard-DPI)
+            -14,                    # ~14px Body-Größe unter Windows 11
             0, 0, 0,
             400,                    # FW_NORMAL
             0, 0, 0,                # Italic, Underline, StrikeOut
@@ -77,8 +82,12 @@ def get_system_font() -> wintypes.HANDLE:
             0, 0,                   # OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS
             5,                      # CLEARTYPE_QUALITY
             0,                      # DEFAULT_PITCH | FF_DONTCARE
-            "Segoe UI"              # Offizielle UI-Schriftart ab Windows Vista/10/11
+            "Segoe UI Variable Text",
         )
+        if _is_invalid_handle(_SYSTEM_FONT):
+            _SYSTEM_FONT = gdi32.CreateFontW(
+                -14, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, "Segoe UI"
+            )
     return _SYSTEM_FONT
 
 
@@ -183,8 +192,29 @@ def init_common_controls(flags: int = _DEFAULT_ICC_FLAGS) -> bool:
     return bool(comctl32.InitCommonControlsEx(ctypes.byref(icex)))
 
 
+def apply_window_chrome(hwnd: wintypes.HWND) -> None:
+    """
+    Sysinternals-Look: Light-Titelleiste und runde Win11-Ecken.
+    Win32-Controls haben keinen nativen Dark Mode — die Titelleiste
+    wird daher zwingend hell gehalten, passend zum #F3F3F3-Canvas.
+    """
+    if not hwnd or dwmapi is None:
+        return
+
+    def _set(attr: int, value: int) -> None:
+        data = ctypes.c_int(value)
+        dwmapi.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(data), ctypes.sizeof(data))
+
+    _set(DWMWA_USE_IMMERSIVE_DARK_MODE, 0)
+    _set(DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, 0)
+    _set(DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND)
+
+
 def _cleanup_gdi() -> None:
     global _SYSTEM_FONT, _H_ACTCTX
+    from barewingui.theme import cleanup_theme
+
+    cleanup_theme()
     if _SYSTEM_FONT:
         gdi32.DeleteObject(_SYSTEM_FONT)
         _SYSTEM_FONT = None
@@ -218,6 +248,9 @@ class Application:
         init_dpi_awareness()
         enable_visual_styles()
         init_common_controls()
+        from barewingui.theme import init_theme
+
+        init_theme()
         cls._is_initialized = True
 
     @classmethod

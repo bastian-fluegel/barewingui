@@ -247,5 +247,9 @@ class TestBareWinGUIWindow(unittest.TestCase):
             user32.IsDialogMessageW(root, ctypes.byref(msg))
             self.assertTrue(bool(user32.IsWindow(btn_b.hwnd)))
 
+            from barewingui.core import apply_window_chrome
+
+            apply_window_chrome(win.hwnd)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

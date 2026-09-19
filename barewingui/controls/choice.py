@@ -11,7 +11,7 @@ import ctypes
 import inspect
 from typing import TYPE_CHECKING, Callable, ClassVar
 
-from barewingui.constants import WindowStyle, WindowStyleEx
+from barewingui.constants import WindowStyle
 from barewingui.controls.base import Control
 from barewingui.types import user32
 
@@ -76,7 +76,7 @@ class ComboBox(Control):
         items: list[str] | None = None,
         selected_index: int = 0,
         pos: tuple[int, int] = (0, 0),
-        size: tuple[int, int] = (160, 26),
+        size: tuple[int, int] = (160, 32),
         dropdown_height: int = 220,
         on_change: Callable[[int, str], None] | Callable[[str], None] | Callable[[], None] | None = None,
         editable: bool = False,
@@ -223,7 +223,7 @@ class ListBox(Control):
             | LBS_NOTIFY
             | LBS_NOINTEGRALHEIGHT
         )
-        ex_style = int(WindowStyleEx.CLIENTEDGE)
+        ex_style = 0
 
         super().__init__(
             parent=parent,

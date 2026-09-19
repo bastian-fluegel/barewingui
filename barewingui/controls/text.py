@@ -12,12 +12,13 @@ import inspect
 from typing import TYPE_CHECKING, Callable, ClassVar, Literal
 
 from barewingui.constants import (
+    EC_LEFTMARGIN,
+    EC_RIGHTMARGIN,
     EditMessage,
     EditNotification,
     EditStyle,
     StaticStyle,
     WindowStyle,
-    WindowStyleEx,
 )
 from barewingui.controls.base import Control
 from barewingui.types import user32
@@ -80,7 +81,7 @@ class TextInput(Control):
         parent: Window,
         text: str = "",
         pos: tuple[int, int] = (0, 0),
-        size: tuple[int, int] = (160, 26),
+        size: tuple[int, int] = (160, 32),
         password: bool = False,
         multiline: bool = False,
         readonly: bool = False,
@@ -112,18 +113,28 @@ class TextInput(Control):
         if readonly:
             edit_style |= int(EditStyle.READONLY)
 
-        # WS_EX_CLIENTEDGE sorgt für den vertieften 3D-Rahmen
-        ex_style = int(WindowStyleEx.CLIENTEDGE)
-
+        # Kein WS_BORDER: pechschwarze 1px-Linie. Den Rahmen zeichnet das CFD-Theme.
         super().__init__(
             parent=parent,
             pos=pos,
             size=size,
             text=text,
             style=edit_style,
-            ex_style=ex_style,
+            ex_style=0,
             visible=visible,
             enabled=enabled,
+        )
+        self._apply_text_margins()
+
+    def _apply_text_margins(self) -> None:
+        """8px Innenabstand, damit der Text nicht am Rahmen klebt."""
+        if not self._hwnd:
+            return
+        user32.SendMessageW(
+            self._hwnd,
+            int(EditMessage.SETMARGINS),
+            EC_LEFTMARGIN | EC_RIGHTMARGIN,
+            (8 << 16) | 8,
         )
 
     @property

@@ -230,6 +230,12 @@ user32.SetForegroundWindow.restype = wintypes.BOOL
 user32.GetSysColorBrush.argtypes = [ctypes.c_int]
 user32.GetSysColorBrush.restype = wintypes.HBRUSH
 
+user32.GetSysColor.argtypes = [ctypes.c_int]
+user32.GetSysColor.restype = wintypes.DWORD
+
+user32.FillRect.argtypes = [wintypes.HDC, ctypes.POINTER(wintypes.RECT), wintypes.HBRUSH]
+user32.FillRect.restype = ctypes.c_int
+
 user32.IsDialogMessageW.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.MSG)]
 user32.IsDialogMessageW.restype = wintypes.BOOL
 
@@ -274,6 +280,12 @@ gdi32.DeleteObject.restype = wintypes.BOOL
 gdi32.SetBkMode.argtypes = [wintypes.HDC, ctypes.c_int]
 gdi32.SetBkMode.restype = ctypes.c_int
 
+gdi32.SetBkColor.argtypes = [wintypes.HDC, COLORREF]
+gdi32.SetBkColor.restype = COLORREF
+
+gdi32.SetTextColor.argtypes = [wintypes.HDC, COLORREF]
+gdi32.SetTextColor.restype = COLORREF
+
 gdi32.CreateSolidBrush.argtypes = [COLORREF]
 gdi32.CreateSolidBrush.restype = wintypes.HBRUSH
 
@@ -303,3 +315,29 @@ def load_comctl32() -> ctypes.WinDLL | None:
         comctl32.InitCommonControlsEx.argtypes = [ctypes.POINTER(INITCOMMONCONTROLSEX)]
         comctl32.InitCommonControlsEx.restype = wintypes.BOOL
     return comctl32
+
+
+# DWM Window Attributes (dwmapi.dll)
+DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19
+DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+DWMWA_WINDOW_CORNER_PREFERENCE = 33
+DWMWCP_ROUND = 2
+
+try:
+    dwmapi = ctypes.windll.dwmapi
+    dwmapi.DwmSetWindowAttribute.argtypes = [
+        wintypes.HWND,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+    ]
+    dwmapi.DwmSetWindowAttribute.restype = ctypes.HRESULT
+except OSError:
+    dwmapi = None
+
+try:
+    uxtheme = ctypes.windll.uxtheme
+    uxtheme.SetWindowTheme.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR]
+    uxtheme.SetWindowTheme.restype = ctypes.HRESULT
+except OSError:
+    uxtheme = None

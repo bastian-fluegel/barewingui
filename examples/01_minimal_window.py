@@ -34,7 +34,7 @@ def main() -> int:
         parent=win,
         text="Audit-Prüfung initialisieren",
         pos=(25, 45),
-        size=(410, 26),
+        size=(410, 32),
     )
 
     status_label = Label(
@@ -82,7 +82,7 @@ def main() -> int:
         parent=win,
         text="Erweitertes Logging aktivieren",
         pos=(25, 180),
-        size=(260, 24),
+        size=(260, 32),
         checked=True,
         on_click=on_checkbox_toggled,
     )
@@ -101,7 +101,7 @@ def main() -> int:
         parent=win,
         text="Standard-Triage",
         pos=(25, 245),
-        size=(180, 24),
+        size=(180, 32),
         checked=True,
         group_start=True,
         on_click=lambda: on_mode_changed("Standard-Triage"),
@@ -111,7 +111,7 @@ def main() -> int:
         parent=win,
         text="Forensische Tiefenanalyse",
         pos=(25, 270),
-        size=(220, 24),
+        size=(220, 32),
         on_click=lambda: on_mode_changed("Forensische Tiefenanalyse"),
     )
 

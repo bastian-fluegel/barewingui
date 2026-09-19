@@ -18,7 +18,7 @@ def main() -> int:
     profile_combo = ComboBox(
         win,
         items=["SCADA / OT Leitstelle", "Active Directory DC", "Web-Proxy DMZ"],
-        size=(0, 26),
+        size=(0, 32),
     )
     root.add(profile_combo)
 

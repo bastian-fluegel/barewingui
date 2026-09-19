@@ -20,7 +20,13 @@ from barewingui.constants import (
     WindowStyleEx,
     WM,
 )
-from barewingui.core import Application
+from barewingui.core import Application, apply_window_chrome
+from barewingui.theme import (
+    erase_background,
+    paint_edit,
+    paint_static,
+    window_brush,
+)
 from barewingui.types import (
     LONG_PTR,
     LPARAM,
@@ -30,7 +36,6 @@ from barewingui.types import (
     WNDPROC,
     GetWindowLongPtrW,
     SetWindowLongPtrW,
-    gdi32,
     kernel32,
     user32,
 )
@@ -138,7 +143,7 @@ class Window:
 
         h_instance = kernel32.GetModuleHandleW(None)
         h_cursor = user32.LoadCursorW(None, IDC_ARROW)
-        h_brush = user32.GetSysColorBrush(SysColor.WINDOW)
+        h_brush = window_brush() or user32.GetSysColorBrush(SysColor.WINDOW)
 
         wcex = WNDCLASSEXW()
         wcex.cbSize = ctypes.sizeof(WNDCLASSEXW)
@@ -193,6 +198,7 @@ class Window:
         self._hwnd = hwnd
         self._active_windows[hwnd] = self
         SetWindowLongPtrW(hwnd, int(WindowLong.USERDATA), LONG_PTR(hwnd))
+        apply_window_chrome(hwnd)
 
     @staticmethod
     def _static_wnd_proc(
@@ -258,11 +264,22 @@ class Window:
                     self.on_command(control_id, notification_code, lparam)
                 return 0
 
+            case WM.ERASEBKGND:
+                hdc = wintypes.HDC(wparam)
+                if erase_background(hwnd, hdc):
+                    return 1
+
             case WM.CTLCOLORSTATIC:
                 hdc = wintypes.HDC(wparam)
-                gdi32.SetBkMode(hdc, 1)  # 1 = TRANSPARENT
-                brush = user32.GetSysColorBrush(int(SysColor.WINDOW))
-                return _to_lresult(brush)
+                return _to_lresult(paint_static(hdc))
+
+            case WM.CTLCOLOREDIT:
+                hdc = wintypes.HDC(wparam)
+                return _to_lresult(paint_edit(hdc))
+
+            case WM.CTLCOLORLISTBOX:
+                hdc = wintypes.HDC(wparam)
+                return _to_lresult(paint_edit(hdc))
 
         return _to_lresult(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
 
