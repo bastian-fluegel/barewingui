@@ -1,6 +1,6 @@
 
 <div align="center">
-
+<a id="document-title"></a>
 # BareWinGUI
 
 **Deterministic, zero-dependency native Win32 GUI framework for Python.**
@@ -148,9 +148,9 @@ win.run()
 
 ### Lizenz
 
-Lizenziert unter der MIT-Lizenz. Weitere Informationen in der Datei [LICENSE.md](https://www.google.com/search?q=LICENSE.md&utm_source=gemini).
+Lizenziert unter der MIT-Lizenz. Weitere Informationen in der Datei [LICENSE.md](https://github.com/bastian-fluegel/barewingui/blob/main/LICENSE.md).
 
 ---
 
-[Back to Top / Nach oben](https://www.google.com/search?q=%2523barewingui&utm_source=gemini)
+[Back to Top / Nach oben](#document-title)
 
