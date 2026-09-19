@@ -229,6 +229,3 @@ class Control:
             hwnd_to_destroy = self._hwnd
             self._hwnd = None
             user32.DestroyWindow(hwnd_to_destroy)
-
-    def __del__(self) -> None:
-        self.destroy()

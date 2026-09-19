@@ -6,15 +6,22 @@ Application lifecycle, Per-Monitor DPI Awareness, and Windows Common Controls v6
 
 from __future__ import annotations
 
+import atexit
 import ctypes
+import os
+import tempfile
 from ctypes import wintypes
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from barewingui.types import (
+    ACTCTXW,
+    GA_ROOT,
     INITCOMMONCONTROLSEX,
-    comctl32,
+    ULONG_PTR,
     gdi32,
     kernel32,
+    load_comctl32,
     user32,
 )
 
@@ -36,6 +43,25 @@ _ICC_STANDARD_CLASSES = 0x00004000
 _DEFAULT_ICC_FLAGS = _ICC_WIN95_CLASSES | _ICC_STANDARD_CLASSES
 
 _SYSTEM_FONT: wintypes.HANDLE | None = None
+_ACTCTX_COOKIE = ULONG_PTR(0)
+_H_ACTCTX: wintypes.HANDLE | None = None
+
+_MANIFEST_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+</assembly>
+"""
 
 
 def get_system_font() -> wintypes.HANDLE:
@@ -54,6 +80,68 @@ def get_system_font() -> wintypes.HANDLE:
             "Segoe UI"              # Offizielle UI-Schriftart ab Windows Vista/10/11
         )
     return _SYSTEM_FONT
+
+
+def _is_invalid_handle(handle: object) -> bool:
+    if handle in (None, 0, -1):
+        return True
+    raw = getattr(handle, "value", handle)
+    if raw in (None, 0, -1):
+        return True
+    return int(raw) == int(ctypes.c_void_p(-1).value or 0)
+
+
+def _write_manifest_atomic(path: Path, payload: bytes) -> bool:
+    """Schreibt das ComCtl-v6-Manifest atomar nach %TEMP%."""
+    try:
+        if path.exists() and path.read_bytes() == payload:
+            return True
+    except OSError:
+        pass
+
+    fd, tmp_name = tempfile.mkstemp(
+        prefix="barewingui_comctl6_",
+        suffix=".manifest",
+        dir=str(path.parent),
+    )
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(payload)
+        os.replace(tmp_name, path)
+        return True
+    except OSError:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        return path.exists()
+
+
+def enable_visual_styles() -> bool:
+    """Aktiviert Windows Common Controls v6 dynamisch über einen Activation Context."""
+    global _H_ACTCTX, _ACTCTX_COOKIE
+    if _H_ACTCTX and not _is_invalid_handle(_H_ACTCTX):
+        return True
+
+    manifest_path = Path(tempfile.gettempdir()) / "barewingui_comctl6.manifest"
+    if not _write_manifest_atomic(manifest_path, _MANIFEST_XML.encode("utf-8")):
+        return False
+
+    act = ACTCTXW()
+    act.cbSize = ctypes.sizeof(ACTCTXW)
+    act.lpSource = str(manifest_path)
+
+    h_actctx = kernel32.CreateActCtxW(ctypes.byref(act))
+    if _is_invalid_handle(h_actctx):
+        return False
+
+    _H_ACTCTX = h_actctx
+    success = kernel32.ActivateActCtx(_H_ACTCTX, ctypes.byref(_ACTCTX_COOKIE))
+    if not success:
+        kernel32.ReleaseActCtx(_H_ACTCTX)
+        _H_ACTCTX = None
+        return False
+    return True
 
 
 def init_dpi_awareness() -> bool:
@@ -85,6 +173,7 @@ def init_common_controls(flags: int = _DEFAULT_ICC_FLAGS) -> bool:
     Registriert die modernen Windows Common Controls (comctl32.dll v6)
     für Buttons, Textfelder, Progressbars und Auswahlelemente.
     """
+    comctl32 = load_comctl32()
     if not comctl32 or not hasattr(comctl32, "InitCommonControlsEx"):
         return False
 
@@ -92,6 +181,20 @@ def init_common_controls(flags: int = _DEFAULT_ICC_FLAGS) -> bool:
     icex.dwSize = ctypes.sizeof(INITCOMMONCONTROLSEX)
     icex.dwICC = flags
     return bool(comctl32.InitCommonControlsEx(ctypes.byref(icex)))
+
+
+def _cleanup_gdi() -> None:
+    global _SYSTEM_FONT, _H_ACTCTX
+    if _SYSTEM_FONT:
+        gdi32.DeleteObject(_SYSTEM_FONT)
+        _SYSTEM_FONT = None
+    if _H_ACTCTX and not _is_invalid_handle(_H_ACTCTX):
+        kernel32.DeactivateActCtx(0, _ACTCTX_COOKIE)
+        kernel32.ReleaseActCtx(_H_ACTCTX)
+        _H_ACTCTX = None
+
+
+atexit.register(_cleanup_gdi)
 
 
 class Application:
@@ -113,6 +216,7 @@ class Application:
             return
 
         init_dpi_awareness()
+        enable_visual_styles()
         init_common_controls()
         cls._is_initialized = True
 
@@ -122,7 +226,7 @@ class Application:
         Startet die native Win32-Message-Loop und blockiert, bis PostQuitMessage
         aufgerufen wird.
 
-        :param main_window: Optionales Hauptfenster, dessen Anzeige erzwungen wird.
+        :param main_window: Optionelles Hauptfenster, dessen Anzeige erzwungen wird.
         :return: Exit-Code der Anwendung (wParam aus WM_QUIT).
         """
         cls.initialize()
@@ -136,6 +240,13 @@ class Application:
 
         # GetMessageW liefert > 0 für reguläre Messages, 0 bei WM_QUIT, -1 bei schwerem Fehler
         while user32.GetMessageW(p_msg, None, 0, 0) > 0:
+            # Ermittle das zugehörige Top-Level-Fenster der Nachricht
+            root_hwnd = user32.GetAncestor(msg.hWnd, GA_ROOT) if msg.hWnd else None
+
+            # IsDialogMessage verarbeitet Tab, Return, ESC und Pfeiltasten für Controls
+            if root_hwnd and user32.IsDialogMessageW(root_hwnd, p_msg):
+                continue
+
             user32.TranslateMessage(p_msg)
             user32.DispatchMessageW(p_msg)
 

@@ -23,7 +23,7 @@ Designed for systems administration, digital forensics, incident response, OT/SC
 ### Key Features
 
 * **Zero Dependencies (`dependencies = []`):** Built strictly with the Python standard library. No wheels, no MSVC redistributables, no Node.js/Chromium runtimes.
-* **Minimal Resource Footprint:** Idles at < 15 MB RAM with instantaneous cold starts (< 15 ms).
+* **Minimal Resource Footprint:** Target corridor of < 15 MB idle RAM and < 15 ms cold start (benchmarks pending on Windows 10 x86/x64).
 * **Supply-Chain Security:** Zero external packages means zero foreign CVEs. Fully auditable for air-gapped and hardened networks.
 * **Modern Python 3.11+ Core:** Fully typed with pointer-adaptive Win32 types (`WPARAM`, `LPARAM`, `c_ssize_t`), eliminating 64-bit integer overflow errors.
 * **Native Windows 10 & 11 UI:** Direct integration with Common Controls v6 (`comctl32.dll`) for an authentic OS appearance without custom theme emulation.
@@ -31,7 +31,7 @@ Designed for systems administration, digital forensics, incident response, OT/SC
 ### Supported Environments
 
 * **Operating Systems:** Windows 10 (Build 1809+), Windows 11, Windows Server (2016+).
-* **Architectures:** 64-bit (x64) and 32-bit (x86).
+* **Architectures:** 64-bit (x64) and 32-bit (x86). ARM64 (Windows-on-ARM) is experimental / untested.
 * **Python Runtime:** Python >= 3.11.
 
 ### Installation
@@ -39,10 +39,9 @@ Designed for systems administration, digital forensics, incident response, OT/SC
 Clone and install in editable mode:
 
 ```bash
-git clone [https://github.com/bastian-fluegel/barewingui.git](https://github.com/bastian-fluegel/barewingui.git)
+git clone https://github.com/bastian-fluegel/barewingui.git
 cd barewingui
 pip install -e .
-
 ```
 
 ### Quickstart
@@ -78,7 +77,7 @@ win.run()
 
 ### License
 
-Distributed under the MIT License. See [LICENSE.md](https://www.google.com/search?q=LICENSE.md&utm_source=gemini) for details.
+Distributed under the MIT License. See [LICENSE.md](LICENSE.md) for details.
 
 ---
 <a id="barewingui-de"></a>
@@ -88,12 +87,12 @@ BareWinGUI ist ein minimalistisches GUI-Framework, das kompromisslos für Window
 
 Konzipiert für Systemadministration, digitale Forensik, Incident Response, OT/SCADA-Bedienoberflächen und sicherheitskritische Unternehmensnetze.
 
-[Zur englischen Version springen 🇬🇧](https://www.google.com/search?q=%2523barewingui-en&utm_source=gemini)
+[Zur englischen Version springen 🇬🇧](#barewingui-en)
 
 ### Kernmerkmale
 
 * **Keine externen Abhängigkeiten (`dependencies = []`):** Ausschließlich auf Basis der Python-Standardbibliothek realisiert. Keine Third-Party-Wheels, keine MSVC-Runtimes, kein WebView2.
-* **Minimaler Ressourcenverbrauch:** Unter 15 MB RAM-Auslastung im Leerlauf und Kaltstarts in unter 15 Millisekunden.
+* **Minimaler Ressourcenverbrauch:** Zielkorridor unter 15 MB RAM im Leerlauf und Kaltstarts unter 15 Millisekunden (Benchmarks ausstehend auf Win10 x86/x64).
 * **Maximale Supply-Chain-Sicherheit:** Keine externen Pakete bedeuten null Fremdschwachstellen (CVEs). Vollständig auditierbar für Air-Gapped- und KRITIS-Umgebungen.
 * **Moderne Python 3.11+ Basis:** Durchgehend typisiert mit pointer-adaptiven Win32-Typen (`WPARAM`, `LPARAM`, `c_ssize_t`) zur Vermeidung von 64-Bit-Überläufen.
 * **Authentische Windows 10 & 11 Optik:** Direkte Nutzung der Windows Common Controls v6 (`comctl32.dll`) für ein natives Erscheinungsbild ohne künstliche Themes.
@@ -101,7 +100,7 @@ Konzipiert für Systemadministration, digitale Forensik, Incident Response, OT/S
 ### Unterstützte Plattformen
 
 * **Betriebssysteme:** Windows 10 (ab Build 1809), Windows 11, Windows Server (ab Version 2016).
-* **Architekturen:** 64-Bit (x64) und 32-Bit (x86).
+* **Architekturen:** 64-Bit (x64) und 32-Bit (x86). ARM64 (Windows-on-ARM) ist experimentell / ungetestet.
 * **Python-Version:** Python >= 3.11.
 
 ### Installation
@@ -109,10 +108,9 @@ Konzipiert für Systemadministration, digitale Forensik, Incident Response, OT/S
 Entwicklungsinstallation direkt aus dem Quellcode:
 
 ```bash
-git clone [https://github.com/bastian-fluegel/barewingui.git](https://github.com/bastian-fluegel/barewingui.git)
+git clone https://github.com/bastian-fluegel/barewingui.git
 cd barewingui
 pip install -e .
-
 ```
 
 ### Schnellstart
@@ -140,7 +138,7 @@ from barewingui import Window, Button, Label
 
 win = Window(title="Triage-Konsole", width=420, height=220)
 Label(win, text="Systemstatus: Bereit", pos=(20, 20))
-Button(win, text="Scan starten", pos=(20, 60), on_click=lambda: print("Scan läuft..."))
+Button(win, text="Scan starten", pos=(20, 60), on_click=lambda: print("Scanning..."))
 
 win.run()
 
@@ -148,9 +146,8 @@ win.run()
 
 ### Lizenz
 
-Lizenziert unter der MIT-Lizenz. Weitere Informationen in der Datei [LICENSE.md](https://www.google.com/search?q=LICENSE.md&utm_source=gemini).
+Lizenziert unter der MIT-Lizenz. Weitere Informationen in der Datei [LICENSE.md](LICENSE.md).
 
 ---
 
-[Back to Top / Nach oben](https://www.google.com/search?q=%2523barewingui&utm_source=gemini)
-
+[Back to Top / Nach oben](#barewingui-en)

@@ -87,7 +87,7 @@ class Window:
         x: int = CW_USEDEFAULT,
         y: int = CW_USEDEFAULT,
         style: WindowStyle = WindowStyle.OVERLAPPEDWINDOW,
-        ex_style: WindowStyleEx = WindowStyleEx.APPWINDOW,
+        ex_style: WindowStyleEx = WindowStyleEx.APPWINDOW | WindowStyleEx.CONTROLPARENT,
     ) -> None:
         self._title = title
         self._width = width
@@ -169,7 +169,7 @@ class Window:
         Window._pending_window = self
 
         hwnd = user32.CreateWindowExW(
-            int(self._ex_style),
+            int(self._ex_style) | int(WindowStyleEx.CONTROLPARENT),
             self._CLASS_NAME,
             self._title,
             int(self._style),
@@ -270,6 +270,9 @@ class Window:
         """Zerstört das native HWND deterministisch (RAII)."""
         if self._hwnd:
             hwnd_to_destroy = self._hwnd
+            # Child-HWNDs werden mit dem Parent zerstört — Python-Refs entkoppeln
+            for control in self._controls.values():
+                control._hwnd = None
             # Erst Windows zerstören lassen (löst synchron WM_DESTROY aus), danach Nullen
             user32.DestroyWindow(hwnd_to_destroy)
             self._hwnd = None
@@ -305,7 +308,4 @@ class Window:
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        self.destroy()
-
-    def __del__(self) -> None:
         self.destroy()

@@ -17,19 +17,19 @@ user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
 gdi32 = ctypes.windll.gdi32
 
-try:
-    comctl32 = ctypes.windll.comctl32
-except OSError:
-    comctl32 = None
+# comctl32 darf erst nach ActivateActCtx geladen werden, sonst bleibt v5 gebunden.
+comctl32 = None
 
 # ---------------------------------------------------------------------------
 # Pointer-adaptive Basis-Typen (32-Bit: 4 Bytes, 64-Bit: 8 Bytes)
 # ---------------------------------------------------------------------------
 LONG_PTR = ctypes.c_ssize_t
 UINT_PTR = ctypes.c_size_t
+ULONG_PTR = ctypes.c_size_t
 LRESULT = ctypes.c_ssize_t
 WPARAM = wintypes.WPARAM
 LPARAM = wintypes.LPARAM
+GA_ROOT = 2
 
 COLORREF = wintypes.DWORD
 HGDIOBJ = wintypes.HANDLE
@@ -96,6 +96,19 @@ class INITCOMMONCONTROLSEX(ctypes.Structure):
     _fields_ = [
         ("dwSize", wintypes.DWORD),
         ("dwICC", wintypes.DWORD),
+    ]
+
+class ACTCTXW(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.ULONG),
+        ("dwFlags", wintypes.DWORD),
+        ("lpSource", wintypes.LPCWSTR),
+        ("wProcessorArchitecture", wintypes.WORD),
+        ("wLangId", wintypes.LANGID),
+        ("lpAssemblyDirectory", wintypes.LPCWSTR),
+        ("lpResourceName", wintypes.LPCWSTR),
+        ("lpApplicationName", wintypes.LPCWSTR),
+        ("hModule", wintypes.HMODULE),
     ]
 
 # ---------------------------------------------------------------------------
@@ -217,6 +230,12 @@ user32.SetForegroundWindow.restype = wintypes.BOOL
 user32.GetSysColorBrush.argtypes = [ctypes.c_int]
 user32.GetSysColorBrush.restype = wintypes.HBRUSH
 
+user32.IsDialogMessageW.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.MSG)]
+user32.IsDialogMessageW.restype = wintypes.BOOL
+
+user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+user32.GetAncestor.restype = wintypes.HWND
+
 # High-DPI Awareness ab Windows 10 (Version 1703+)
 if hasattr(user32, "SetProcessDpiAwarenessContext"):
     user32.SetProcessDpiAwarenessContext.argtypes = [ctypes.c_void_p]
@@ -230,6 +249,18 @@ kernel32.GetModuleHandleW.restype = wintypes.HINSTANCE
 
 kernel32.GetLastError.argtypes = []
 kernel32.GetLastError.restype = wintypes.DWORD
+
+kernel32.CreateActCtxW.argtypes = [ctypes.POINTER(ACTCTXW)]
+kernel32.CreateActCtxW.restype = wintypes.HANDLE
+
+kernel32.ActivateActCtx.argtypes = [wintypes.HANDLE, ctypes.POINTER(ULONG_PTR)]
+kernel32.ActivateActCtx.restype = wintypes.BOOL
+
+kernel32.DeactivateActCtx.argtypes = [wintypes.DWORD, ULONG_PTR]
+kernel32.DeactivateActCtx.restype = wintypes.BOOL
+
+kernel32.ReleaseActCtx.argtypes = [wintypes.HANDLE]
+kernel32.ReleaseActCtx.restype = None
 
 # ---------------------------------------------------------------------------
 # GDI32 Funktions-Signaturen
@@ -254,9 +285,21 @@ gdi32.CreateFontW.argtypes = [
 ]
 gdi32.CreateFontW.restype = HFONT
 
-# ---------------------------------------------------------------------------
-# COMCTL32 Funktions-Signaturen (Windows Common Controls v6)
-# ---------------------------------------------------------------------------
-if comctl32 and hasattr(comctl32, "InitCommonControlsEx"):
-    comctl32.InitCommonControlsEx.argtypes = [ctypes.POINTER(INITCOMMONCONTROLSEX)]
-    comctl32.InitCommonControlsEx.restype = wintypes.BOOL
+
+def load_comctl32() -> ctypes.WinDLL | None:
+    """
+    Lädt comctl32.dll erst nach einem aktiven Activation Context,
+    damit Windows die Isolation auf Version 6.0.0.0 anwendet.
+    """
+    global comctl32
+    if comctl32 is not None:
+        return comctl32
+    try:
+        comctl32 = ctypes.WinDLL("comctl32", use_last_error=True)
+    except OSError:
+        comctl32 = None
+        return None
+    if hasattr(comctl32, "InitCommonControlsEx"):
+        comctl32.InitCommonControlsEx.argtypes = [ctypes.POINTER(INITCOMMONCONTROLSEX)]
+        comctl32.InitCommonControlsEx.restype = wintypes.BOOL
+    return comctl32

@@ -8,6 +8,7 @@ bidirektionale Eigenschaftssynchronisation und Windows-Message-Routing ohne GUI-
 
 from __future__ import annotations
 
+import ctypes
 import os
 import sys
 import unittest
@@ -16,10 +17,11 @@ from ctypes import wintypes
 # Projekt-Wurzelverzeichnis für direkte Ausführung auffindbar machen
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from barewingui.constants import ButtonNotification, EditNotification, WM
+from barewingui.constants import ButtonNotification, EditNotification, WindowLong, WindowStyleEx, WM
 from barewingui.controls import Button, CheckBox, ComboBox, Label, ListBox, RadioButton, TextInput
 from barewingui.controls.choice import CBN_SELCHANGE, LBN_SELCHANGE
-from barewingui.types import user32
+from barewingui.core import Application, enable_visual_styles, get_system_font
+from barewingui.types import GA_ROOT, GetWindowLongPtrW, load_comctl32, user32
 from barewingui.window import Window
 
 # Sicherstellen, dass IsWindow typisiert ist
@@ -193,6 +195,57 @@ class TestBareWinGUIWindow(unittest.TestCase):
             self.assertIsNone(combo.selected_text)
             lst.clear()
             self.assertIsNone(lst.selected_text)
+
+    def test_comctl_v6_actctx_and_dialog_keys(self) -> None:
+        """Prüft ActCtx/ComCtl v6, WS_EX_CONTROLPARENT und IsDialogMessageW."""
+        self.assertTrue(enable_visual_styles())
+        Application.initialize()
+        self.assertTrue(enable_visual_styles())
+
+        comctl32 = load_comctl32()
+        self.assertIsNotNone(comctl32)
+        self.assertTrue(hasattr(comctl32, "InitCommonControlsEx"))
+
+        class DLLVERSIONINFO(ctypes.Structure):
+            _fields_ = [
+                ("cbSize", wintypes.DWORD),
+                ("dwMajorVersion", wintypes.DWORD),
+                ("dwMinorVersion", wintypes.DWORD),
+                ("dwBuildNumber", wintypes.DWORD),
+                ("dwPlatformID", wintypes.DWORD),
+            ]
+
+        if hasattr(comctl32, "DllGetVersion"):
+            comctl32.DllGetVersion.argtypes = [ctypes.POINTER(DLLVERSIONINFO)]
+            comctl32.DllGetVersion.restype = ctypes.HRESULT
+            info = DLLVERSIONINFO()
+            info.cbSize = ctypes.sizeof(DLLVERSIONINFO)
+            hr = comctl32.DllGetVersion(ctypes.byref(info))
+            self.assertEqual(hr, 0)
+            self.assertGreaterEqual(info.dwMajorVersion, 6)
+
+        self.assertFalse(hasattr(Window, "__del__"))
+        h_font = get_system_font()
+        self.assertTrue(bool(h_font))
+
+        with Window(title="Keyboard Nav Test", width=360, height=180) as win:
+            ex_style = int(GetWindowLongPtrW(win.hwnd, int(WindowLong.EXSTYLE)))
+            self.assertTrue(
+                ex_style & int(WindowStyleEx.CONTROLPARENT),
+                "WS_EX_CONTROLPARENT ist für IsDialogMessageW erforderlich",
+            )
+            btn_a = Button(win, text="Eins", pos=(12, 12), size=(90, 28))
+            btn_b = Button(win, text="Zwei", pos=(112, 12), size=(90, 28), default=True)
+
+            msg = wintypes.MSG()
+            msg.hWnd = btn_a.hwnd
+            msg.message = int(WM.KEYDOWN)
+            msg.wParam = 0x09  # VK_TAB
+            root = user32.GetAncestor(btn_a.hwnd, GA_ROOT)
+            self.assertTrue(bool(root))
+            # Darf nicht werfen; Rückgabewert hängt vom Fokus ab
+            user32.IsDialogMessageW(root, ctypes.byref(msg))
+            self.assertTrue(bool(user32.IsWindow(btn_b.hwnd)))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

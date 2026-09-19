@@ -9,13 +9,13 @@
 ## 2. Unterstützte Plattformen & Laufzeitumgebung
 * **Betriebssysteme:** Windows 10 (ab Build 1809), Windows 11, Windows Server (ab 2016).
 * **Minimale Plattformgrenze:** Windows 10 (Versionen vor Windows 10 wie Win 7/8.1 sind explizit ausgeschlossen).
-* **Architekturen:** x64 (64-Bit), x86 (32-Bit), ARM64 (über Windows-on-ARM Win32-Subsystem).
+* **Architekturen:** x64 (64-Bit), x86 (32-Bit). ARM64 (Windows-on-ARM) ist experimentell / ungetestet, solange keine native WoA-Testinstanz vorliegt.
 * **Python-Version:** Python >= 3.11 (strikt typisiert, Nutzung von `slots`, modernen Union-Types und Standardbibliotheks-Optimierungen).
 
 ## 3. Technische Leitplanken (Inviolable Rules)
 * **Paketabhängigkeiten:** `dependencies = []`. Es dürfen ausschließlich Module der Python-Standardbibliothek importiert werden (`ctypes`, `wintypes`, `enum`, `dataclasses`, `typing`, `sys`, `math`).
 * **Architektur-Agnostik:** Keine hardcodierten Bit-Breiten. Alle Handles, Zeiger und Message-Parameter müssen pointer-adaptiv sein (`ctypes.c_ssize_t`, `wintypes.WPARAM`, `wintypes.LPARAM`, `wintypes.HWND`).
-* **Speicher- und Handle-Sicherheit (RAII):** Jedes Betriebssystem-Handle (`HWND`, `HDC`, `HGDIOBJ`, `PIDL`) unterliegt einem deterministischen Lebenszyklus und muss bei Zerstörung freigegeben werden (`DestroyWindow`, `DeleteDC`, `DeleteObject`, `CoTaskMemFree`).
+* **Speicher- und Handle-Sicherheit (RAII):** Jedes Betriebssystem-Handle (`HWND`, `HDC`, `HGDIOBJ`, `PIDL`) unterliegt einem deterministischen Lebenszyklus und muss bei Zerstörung freigegeben werden (`DestroyWindow`, `DeleteDC`, `DeleteObject`, `CoTaskMemFree`). Fenster und Controls werden über Context Manager oder explizites `destroy()` / `close()` freigegeben — niemals aus `__del__` (Win32 Thread Affinity). `HFONT` aus `CreateFontW` wird über `atexit` freigegeben.
 * **GC-Verankerung (Callback Safety):** Instanzen von `WNDPROC` müssen dauerhaft an die Lebensdauer des Fensters gebunden sein, um Garbage-Collection-Crashs (`Access Violation`) auszuschließen.
 * **UI-Erscheinungsbild:** Keine synthetischen CSS- oder Theming-Engines. Steuerelemente nutzen native Windows Common Controls v6 (`comctl32.dll`) und die jeweilige System-Schriftart (`Segoe UI`).
 
@@ -26,6 +26,7 @@
 * Kein Support für veraltete Python-Versionen (< 3.11).
 
 ## 5. Ziel-Leistungsmetriken
+Zielkorridor (Benchmarks ausstehend auf Win10 x86/x64):
 * **Arbeitsspeicher (Idle):** < 15 MB RAM.
 * **Kaltstartzeit:** < 15 Millisekunden bis zur ersten Eingabebereitschaft.
 * **Artefaktgröße (Frozen Executable):** < 12 MB via PyInstaller / Nuitka.
