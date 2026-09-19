@@ -1,12 +1,10 @@
 """
 barewingui.theme
 ~~~~~~~~~~~~~~~~
-Sysinternals-style Windows 11 light surfaces and uxtheme control styling.
+Sysinternals-style Windows 11 light surfaces and Explorer theming.
 
-Classic Win32 controls (BUTTON, COMBOBOX, scrollbars) have no native Dark Mode.
-Painting a dark client while those controls stay light collapses into
-High Contrast Black. BareWinGUI therefore uses a consistent light canvas
-(#F3F3F3) with a forced light title bar.
+Win32 has no native Dark Mode. BareWinGUI therefore uses a consistent
+light canvas (#F3F3F3), white control surfaces, and SetWindowTheme("Explorer").
 """
 
 from __future__ import annotations
@@ -16,97 +14,88 @@ from ctypes import wintypes
 
 from barewingui.types import gdi32, uxtheme, user32
 
-# Win11 Settings / Explorer surfaces (COLORREF = 0x00BBGGRR)
-_WINDOW_COLOR = 0x00F3F3F3  # RGB(243, 243, 243)
-_CONTROL_COLOR = 0x00FFFFFF  # RGB(255, 255, 255)
-_TEXT_COLOR = 0x00111111     # RGB(17, 17, 17)
+# COLORREF = 0x00BBGGRR
+COLOR_CANVAS = 0x00F3F3F3    # #F3F3F3
+COLOR_SURFACE = 0x00FFFFFF   # #FFFFFF
+COLOR_TEXT = 0x00111111      # #111111
+
+_BKMODE_TRANSPARENT = 1
+_BKMODE_OPAQUE = 2
 
 _initialized = False
-_window_brush: wintypes.HBRUSH | None = None
-_control_brush: wintypes.HBRUSH | None = None
-
-
-def uses_dark_mode() -> bool:
-    """Win32 Dark Mode is not used. Always False (Sysinternals light canvas)."""
-    return False
+_brush_canvas: wintypes.HBRUSH | None = None
+_brush_surface: wintypes.HBRUSH | None = None
 
 
 def window_brush() -> wintypes.HBRUSH | None:
-    return _window_brush
+    return _brush_canvas
 
 
 def control_brush() -> wintypes.HBRUSH | None:
-    return _control_brush
-
-
-def text_color() -> int:
-    return _TEXT_COLOR
-
-
-def control_color() -> int:
-    return _CONTROL_COLOR
-
-
-def theme_name(class_name: str) -> str | None:
-    """uxtheme class: Explorer for lists/buttons, CFD for edits."""
-    mapping = {
-        "BUTTON": "Explorer",
-        "EDIT": "CFD",
-        "COMBOBOX": "Explorer",
-        "LISTBOX": "Explorer",
-    }
-    return mapping.get(class_name.upper())
+    return _brush_surface
 
 
 def init_theme() -> None:
-    global _initialized, _window_brush, _control_brush
+    global _initialized, _brush_canvas, _brush_surface
     if _initialized:
         return
-
-    _window_brush = gdi32.CreateSolidBrush(_WINDOW_COLOR)
-    _control_brush = gdi32.CreateSolidBrush(_CONTROL_COLOR)
+    _brush_canvas = gdi32.CreateSolidBrush(COLOR_CANVAS)
+    _brush_surface = gdi32.CreateSolidBrush(COLOR_SURFACE)
     _initialized = True
 
 
 def cleanup_theme() -> None:
-    global _window_brush, _control_brush, _initialized
-    if _window_brush:
-        gdi32.DeleteObject(_window_brush)
-    if _control_brush:
-        gdi32.DeleteObject(_control_brush)
-    _window_brush = None
-    _control_brush = None
+    global _brush_canvas, _brush_surface, _initialized
+    if _brush_canvas:
+        gdi32.DeleteObject(_brush_canvas)
+    if _brush_surface:
+        gdi32.DeleteObject(_brush_surface)
+    _brush_canvas = None
+    _brush_surface = None
     _initialized = False
 
 
-def apply_control_theme(hwnd: wintypes.HWND, class_name: str) -> None:
+def apply_control_theme(hwnd: wintypes.HWND, class_name: str = "") -> None:
     if not hwnd or uxtheme is None:
         return
-    name = theme_name(class_name)
-    if name:
-        uxtheme.SetWindowTheme(hwnd, name, None)
+    uxtheme.SetWindowTheme(hwnd, "Explorer", None)
 
 
-def paint_static(hdc: wintypes.HDC) -> int:
-    gdi32.SetBkMode(hdc, 1)  # TRANSPARENT
-    gdi32.SetTextColor(hdc, _TEXT_COLOR)
-    return _brush_int(_window_brush)
+def paint_static(hdc: wintypes.HDC, hwnd_ctl: wintypes.HWND | None = None) -> int:
+    # Read-only Edits senden WM_CTLCOLORSTATIC statt WM_CTLCOLOREDIT.
+    if hwnd_ctl and _is_edit_class(hwnd_ctl):
+        return paint_edit(hdc)
+    gdi32.SetBkMode(hdc, _BKMODE_TRANSPARENT)
+    gdi32.SetTextColor(hdc, COLOR_TEXT)
+    return _brush_int(_brush_canvas)
 
 
 def paint_edit(hdc: wintypes.HDC) -> int:
-    gdi32.SetBkMode(hdc, 1)
-    gdi32.SetTextColor(hdc, _TEXT_COLOR)
-    gdi32.SetBkColor(hdc, _CONTROL_COLOR)
-    return _brush_int(_control_brush)
+    gdi32.SetBkMode(hdc, _BKMODE_OPAQUE)
+    gdi32.SetBkColor(hdc, COLOR_SURFACE)
+    gdi32.SetTextColor(hdc, COLOR_TEXT)
+    return _brush_int(_brush_surface)
+
+
+def paint_button(hdc: wintypes.HDC) -> int:
+    gdi32.SetBkMode(hdc, _BKMODE_TRANSPARENT)
+    gdi32.SetTextColor(hdc, COLOR_TEXT)
+    return _brush_int(_brush_canvas)
 
 
 def erase_background(hwnd: wintypes.HWND, hdc: wintypes.HDC) -> bool:
-    if not _window_brush:
+    if not _brush_canvas:
         return False
     rc = wintypes.RECT()
     user32.GetClientRect(hwnd, ctypes.byref(rc))
-    user32.FillRect(hdc, ctypes.byref(rc), _window_brush)
+    user32.FillRect(hdc, ctypes.byref(rc), _brush_canvas)
     return True
+
+
+def _is_edit_class(hwnd: wintypes.HWND) -> bool:
+    buf = ctypes.create_unicode_buffer(32)
+    user32.GetClassNameW(hwnd, buf, 32)
+    return buf.value.upper() == "EDIT"
 
 
 def _brush_int(brush: wintypes.HBRUSH | None) -> int:

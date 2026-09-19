@@ -14,6 +14,7 @@ from ctypes import wintypes
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
+from barewingui.constants import EditStyle, VirtualKey, WindowLong, WM
 from barewingui.types import (
     ACTCTXW,
     DWMWA_USE_IMMERSIVE_DARK_MODE,
@@ -23,6 +24,7 @@ from barewingui.types import (
     GA_ROOT,
     INITCOMMONCONTROLSEX,
     ULONG_PTR,
+    GetWindowLongPtrW,
     dwmapi,
     gdi32,
     kernel32,
@@ -195,8 +197,7 @@ def init_common_controls(flags: int = _DEFAULT_ICC_FLAGS) -> bool:
 def apply_window_chrome(hwnd: wintypes.HWND) -> None:
     """
     Sysinternals-Look: Light-Titelleiste und runde Win11-Ecken.
-    Win32-Controls haben keinen nativen Dark Mode — die Titelleiste
-    wird daher zwingend hell gehalten, passend zum #F3F3F3-Canvas.
+    Die Caption wird fest hell gehalten, passend zum #F3F3F3-Canvas.
     """
     if not hwnd or dwmapi is None:
         return
@@ -276,6 +277,11 @@ class Application:
             # Ermittle das zugehörige Top-Level-Fenster der Nachricht
             root_hwnd = user32.GetAncestor(msg.hWnd, GA_ROOT) if msg.hWnd else None
 
+            # ES_MULTILINE beansprucht Tab (DLGC_WANTTAB). IsDialogMessageW
+            # würde den Sprung schlucken — daher vorab GetNextDlgTabItem.
+            if root_hwnd and _tab_out_of_multiline_edit(root_hwnd, msg):
+                continue
+
             # IsDialogMessage verarbeitet Tab, Return, ESC und Pfeiltasten für Controls
             if root_hwnd and user32.IsDialogMessageW(root_hwnd, p_msg):
                 continue
@@ -289,3 +295,49 @@ class Application:
     def quit(cls, exit_code: int = 0) -> None:
         """Beendet die Message-Loop kontrolliert mit dem angegebenen Exit-Code."""
         user32.PostQuitMessage(exit_code)
+
+
+def _key_down(vk: int) -> bool:
+    return bool(user32.GetKeyState(vk) & 0x8000)
+
+
+def _class_name(hwnd: wintypes.HWND) -> str:
+    buf = ctypes.create_unicode_buffer(32)
+    user32.GetClassNameW(hwnd, buf, 32)
+    return buf.value
+
+
+def _hwnd_int(hwnd: object) -> int:
+    if not hwnd:
+        return 0
+    raw = getattr(hwnd, "value", hwnd)
+    return 0 if raw is None else int(raw)
+
+
+def _tab_out_of_multiline_edit(root_hwnd: wintypes.HWND, msg: wintypes.MSG) -> bool:
+    """
+    Springt bei Tab aus einem mehrzeiligen Edit zum nächsten Dialog-Tab-Item.
+    Gibt True zurück, wenn die Taste verarbeitet wurde.
+    """
+    if msg.message != int(WM.KEYDOWN) or int(msg.wParam) != int(VirtualKey.TAB):
+        return False
+    if _key_down(int(VirtualKey.CONTROL)):
+        return False
+
+    focus_hwnd = user32.GetFocus()
+    if not focus_hwnd:
+        return False
+    if _class_name(focus_hwnd).upper() != "EDIT":
+        return False
+
+    style = int(GetWindowLongPtrW(focus_hwnd, int(WindowLong.STYLE)))
+    if not (style & int(EditStyle.MULTILINE)):
+        return False
+
+    backwards = _key_down(int(VirtualKey.SHIFT))
+    next_ctl = user32.GetNextDlgTabItem(root_hwnd, focus_hwnd, backwards)
+    if not next_ctl or _hwnd_int(next_ctl) == _hwnd_int(focus_hwnd):
+        return False
+
+    user32.SetFocus(next_ctl)
+    return True

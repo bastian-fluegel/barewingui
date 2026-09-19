@@ -242,6 +242,18 @@ user32.IsDialogMessageW.restype = wintypes.BOOL
 user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
 user32.GetAncestor.restype = wintypes.HWND
 
+user32.GetFocus.argtypes = []
+user32.GetFocus.restype = wintypes.HWND
+
+user32.GetNextDlgTabItem.argtypes = [wintypes.HWND, wintypes.HWND, wintypes.BOOL]
+user32.GetNextDlgTabItem.restype = wintypes.HWND
+
+user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+user32.GetClassNameW.restype = ctypes.c_int
+
+user32.GetKeyState.argtypes = [ctypes.c_int]
+user32.GetKeyState.restype = wintypes.SHORT
+
 # High-DPI Awareness ab Windows 10 (Version 1703+)
 if hasattr(user32, "SetProcessDpiAwarenessContext"):
     user32.SetProcessDpiAwarenessContext.argtypes = [ctypes.c_void_p]

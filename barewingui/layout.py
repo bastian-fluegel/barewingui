@@ -70,6 +70,14 @@ class Box:
         :param stretch: Dehnungsfaktor (> 0 nimmt verfügbaren Leerraum proportional ein).
         :param fixed_size: Feste Ausdehnung entlang der Hauptachse (ignoriert Control-Größe).
         """
+        if stretch == 0 and fixed_size is None:
+            if isinstance(item, Box) and item.fixed_size is not None:
+                fixed_size = item.fixed_size
+            elif hasattr(item, "size"):
+                measured = item.size[1] if self.orientation == "vertical" else item.size[0]
+                if measured > 0:
+                    fixed_size = measured
+
         self._items.append(_LayoutItem(target=item, stretch=stretch, fixed_size=fixed_size))
         return self
 
@@ -108,13 +116,13 @@ class Box:
                 total_stretch += item.stretch
                 allocated_sizes.append(0)
             else:
-                size = 0
+                size = 24
                 if item.fixed_size is not None:
                     size = item.fixed_size
                 elif item.target is None:
                     size = 0
                 elif isinstance(item.target, Box):
-                    size = item.target.fixed_size or 30
+                    size = item.target.fixed_size or 24
                 else:
                     # Control: Höhe bei VBox, Breite bei HBox übernehmen
                     size = item.target.size[1] if is_vertical else item.target.size[0]

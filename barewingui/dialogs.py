@@ -349,12 +349,17 @@ def _input_proc(hwnd: wintypes.HWND, msg: int, wparam: WPARAM, lparam: LPARAM) -
     if msg == int(WM.CTLCOLORSTATIC):
         from barewingui.theme import paint_static
 
-        return _to_lresult(paint_static(wintypes.HDC(wparam)))
+        return _to_lresult(paint_static(wintypes.HDC(wparam), wintypes.HWND(lparam)))
 
-    if msg == int(WM.CTLCOLOREDIT):
+    if msg == int(WM.CTLCOLOREDIT) or msg == int(WM.CTLCOLORLISTBOX):
         from barewingui.theme import paint_edit
 
         return _to_lresult(paint_edit(wintypes.HDC(wparam)))
+
+    if msg == int(WM.CTLCOLORBTN):
+        from barewingui.theme import paint_button
+
+        return _to_lresult(paint_button(wintypes.HDC(wparam)))
 
     if session is None:
         return _to_lresult(user32.DefWindowProcW(hwnd, msg, wparam, lparam))

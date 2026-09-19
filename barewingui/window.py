@@ -23,6 +23,7 @@ from barewingui.constants import (
 from barewingui.core import Application, apply_window_chrome
 from barewingui.theme import (
     erase_background,
+    paint_button,
     paint_edit,
     paint_static,
     window_brush,
@@ -271,15 +272,15 @@ class Window:
 
             case WM.CTLCOLORSTATIC:
                 hdc = wintypes.HDC(wparam)
-                return _to_lresult(paint_static(hdc))
+                return _to_lresult(paint_static(hdc, wintypes.HWND(lparam)))
 
-            case WM.CTLCOLOREDIT:
+            case WM.CTLCOLOREDIT | WM.CTLCOLORLISTBOX:
                 hdc = wintypes.HDC(wparam)
                 return _to_lresult(paint_edit(hdc))
 
-            case WM.CTLCOLORLISTBOX:
+            case WM.CTLCOLORBTN:
                 hdc = wintypes.HDC(wparam)
-                return _to_lresult(paint_edit(hdc))
+                return _to_lresult(paint_button(hdc))
 
         return _to_lresult(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
 

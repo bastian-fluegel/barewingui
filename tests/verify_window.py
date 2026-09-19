@@ -251,5 +251,42 @@ class TestBareWinGUIWindow(unittest.TestCase):
 
             apply_window_chrome(win.hwnd)
 
+    def test_vbox_preserves_natural_height_after_squeeze(self) -> None:
+        """VBox darf die natürliche Höhe nicht dauerhaft durch set_bounds überschreiben."""
+        from barewingui.layout import VBox
+
+        with Window(title="Layout Freeze Test", width=400, height=500) as win:
+            stretchy = ListBox(win, size=(200, 80))
+            detail = TextInput(win, multiline=True, readonly=True, size=(200, 110))
+            root = VBox(padding=0, spacing=0)
+            root.add(stretchy, stretch=1)
+            root.add(detail)
+
+            root.apply(0, 0, 400, 80)
+            self.assertLessEqual(detail.size[1], 80)
+
+            root.apply(0, 0, 400, 500)
+            self.assertEqual(detail.size[1], 110)
+            self.assertGreater(stretchy.size[1], 110)
+
+    def test_multiline_tab_advances_to_next_control(self) -> None:
+        """Tab in ES_MULTILINE darf nicht im Edit hängenbleiben."""
+        from barewingui.constants import VirtualKey
+        from barewingui.core import _hwnd_int, _tab_out_of_multiline_edit
+
+        with Window(title="Multiline Tab Test", width=360, height=220) as win:
+            detail = TextInput(win, multiline=True, readonly=True, pos=(12, 12), size=(300, 80))
+            nxt = Button(win, text="Weiter", pos=(12, 110), size=(90, 32))
+            user32.SetFocus(detail.hwnd)
+
+            msg = wintypes.MSG()
+            msg.hWnd = detail.hwnd
+            msg.message = int(WM.KEYDOWN)
+            msg.wParam = int(VirtualKey.TAB)
+
+            moved = _tab_out_of_multiline_edit(win.hwnd, msg)
+            self.assertTrue(moved, "Tab muss aus dem Multiline-Edit herausspringen")
+            self.assertEqual(_hwnd_int(user32.GetFocus()), _hwnd_int(nxt.hwnd))
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

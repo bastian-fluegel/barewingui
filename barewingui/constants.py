@@ -260,6 +260,12 @@ class ShowWindowCmd(IntEnum):
     FORCEMINIMIZE = 11
 
 
+class VirtualKey(IntEnum):
+    TAB = 0x09
+    SHIFT = 0x10
+    CONTROL = 0x11
+
+
 class WindowLong(IntEnum):
     WNDPROC = -4
     HINSTANCE = -6
