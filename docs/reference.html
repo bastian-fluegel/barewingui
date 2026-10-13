@@ -367,16 +367,16 @@
         <span class="de-text">
           <strong>Architektur-Vorgaben:</strong>
           <ul>
-            <li><strong>Supply-Chain-Sicherheit:</strong> <code>dependencies = []</code>. Keine fremden CVEs in administrativen, forensischen oder KRITIS-Umgebungen.</li>
-            <li><strong>Deterministischer Footprint:</strong> Kaltstart unter 15 ms, Leerlauf &lt; 15 MB RAM.</li>
+            <li><strong>Supply-Chain-Sicherheit:</strong> <code>dependencies = []</code>. Keine Laufzeit-Abhängigkeiten außer Python und den Windows-Systembibliotheken, also keine CVEs fremder Pakete zu verfolgen.</li>
+            <li><strong>Ressourcen-Zielwerte:</strong> Kaltstart unter 15 ms, Leerlauf &lt; 15 MB RAM (Zielwerte, Messung ausstehend).</li>
             <li><strong>Native Windows 10/11 Ästhetik:</strong> Typografische Anbindung an Segoe UI und Aktivierung der Common Controls v6.</li>
           </ul>
         </span>
         <span class="en-text">
           <strong>Architectural Directives:</strong>
           <ul>
-            <li><strong>Supply Chain Hardening:</strong> <code>dependencies = []</code>. Zero foreign CVE exposure for administrative, forensic, or high-assurance networks.</li>
-            <li><strong>Deterministic Footprint:</strong> Cold boot &lt; 15 ms, idle memory &lt; 15 MB RAM.</li>
+            <li><strong>Supply Chain Hardening:</strong> <code>dependencies = []</code>. No runtime dependencies beyond Python and the Windows system DLLs, so there are no third-party package CVEs to track.</li>
+            <li><strong>Resource targets:</strong> Cold start &lt; 15 ms, idle memory &lt; 15 MB RAM (targets, not yet measured).</li>
             <li><strong>Native Windows 10/11 Rendering:</strong> Typographic anchoring to Segoe UI and Comctl32 v6 visual styles.</li>
           </ul>
         </span>

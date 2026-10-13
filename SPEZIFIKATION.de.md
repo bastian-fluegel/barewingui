@@ -2,7 +2,7 @@
 
 ## 1. Projektidentität & Philosophie
 * **Name:** BareWinGUI (`barewingui`)
-* **Ziel:** Ultra-leichtgewichtiges, deterministisches GUI-Framework für Windows auf Basis nativer Win32-APIs.
+* **Ziel:** Leichtgewichtiges, deterministisches GUI-Framework für Windows auf Basis nativer Win32-APIs.
 * **Kernprinzip:** *Zero-Dependency.* Vollständiger Verzicht auf externe Pakete, C++-Runtimes und Browser-Engines.
 * **Verwendungszweck:** Werkzeuge für Systemadministration, Incident Response, OT/SCADA-Leitstände, Forensik und abgesicherte Unternehmensnetze.
 
@@ -17,12 +17,12 @@
 * **Architektur-Agnostik:** Keine hardcodierten Bit-Breiten. Alle Handles, Zeiger und Message-Parameter müssen pointer-adaptiv sein (`ctypes.c_ssize_t`, `wintypes.WPARAM`, `wintypes.LPARAM`, `wintypes.HWND`).
 * **Speicher- und Handle-Sicherheit (RAII):** Jedes Betriebssystem-Handle (`HWND`, `HDC`, `HGDIOBJ`, `PIDL`) unterliegt einem deterministischen Lebenszyklus und muss bei Zerstörung freigegeben werden (`DestroyWindow`, `DeleteDC`, `DeleteObject`, `CoTaskMemFree`). Fenster und Controls werden über Context Manager oder explizites `destroy()` / `close()` freigegeben — niemals aus `__del__` (Win32 Thread Affinity). `HFONT` aus `CreateFontW` wird über `atexit` freigegeben.
 * **GC-Verankerung (Callback Safety):** Instanzen von `WNDPROC` müssen dauerhaft an die Lebensdauer des Fensters gebunden sein, um Garbage-Collection-Crashs (`Access Violation`) auszuschließen.
-* **UI-Erscheinungsbild:** Keine synthetischen CSS- oder Theming-Engines. Steuerelemente nutzen native Windows Common Controls v6 (`comctl32.dll`) und die jeweilige System-Schriftart (`Segoe UI`).
+* **UI-Erscheinungsbild:** Steuerelemente sind native Windows Common Controls v6 (`comctl32.dll`) in der System-Schriftart (`Segoe UI`). Keine eigene Theme-Engine, kein Skinning, keine CSS-Emulation. Das `theme`-Modul setzt nur einheitliche Flächenfarben (Fläche `#F3F3F3`, Steuerelemente weiß, Text `#111111`) über die `WM_CTLCOLOR*`-Behandlung und den Explorer-Visual-Style (`SetWindowTheme`). Ein Dunkelmodus wird nicht unterstützt (keine dokumentierte API für klassische Controls).
 
 ## 4. Nicht-Ziele (Explicit Non-Goals)
 * Keine Cross-Plattform-Unterstützung (kein Linux, kein macOS).
 * Kein HTML/CSS/Web-Rendering.
-* Keine emulierte Design-Wahl (kein Nachbau alter oder fremder OS-Themes).
+* Kein Skinning und kein Nachbau alter oder fremder OS-Themes.
 * Kein Support für veraltete Python-Versionen (< 3.11).
 
 ## 5. Ziel-Leistungsmetriken

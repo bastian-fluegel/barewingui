@@ -14,19 +14,19 @@
 <a id="barewingui-en"></a>
 ## 🇬🇧 BareWinGUI (English)
 
-BareWinGUI is an ultra-lightweight GUI framework engineered exclusively for Windows. By binding directly to core Win32 system DLLs (`user32.dll`, `kernel32.dll`, `comctl32.dll`, `gdi32.dll`, `comdlg32.dll`) via `ctypes`, it completely eliminates external dependencies, C++ runtime installations, and web-engine overhead.
+BareWinGUI is a lightweight GUI framework engineered exclusively for Windows. By binding directly to core Win32 system DLLs (`user32.dll`, `kernel32.dll`, `comctl32.dll`, `gdi32.dll`, `comdlg32.dll`) via `ctypes`, it completely eliminates external dependencies, C++ runtime installations, and web-engine overhead.
 
-Designed for systems administration, digital forensics, incident response, OT/SCADA interfaces, and mission-critical enterprise environments.
+Designed for systems administration, digital forensics, incident response, OT/SCADA interfaces, and hardened enterprise networks.
 
 [Jump to German Version 🇩🇪](#barewingui-de)
 
 ### Key Features
 
-* **Zero Dependencies (`dependencies = []`):** Built strictly with the Python standard library. No wheels, no MSVC redistributables, no Node.js/Chromium runtimes.
+* **Zero Runtime Dependencies (`dependencies = []`):** Built strictly with the Python standard library. No wheels, no MSVC redistributables, no Node.js/Chromium runtimes. (`flit_core` is needed only to build the package.)
 * **Minimal Resource Footprint:** Target corridor of < 15 MB idle RAM and < 15 ms cold start (benchmarks pending on Windows 10 x86/x64).
-* **Supply-Chain Security:** Zero external packages means zero foreign CVEs. Fully auditable for air-gapped and hardened networks.
+* **Small Supply Chain:** No runtime dependencies beyond Python itself and the Windows system DLLs, so there are no third-party package CVEs to track. The code base is small enough to audit for air-gapped and hardened networks.
 * **Modern Python 3.11+ Core:** Fully typed with pointer-adaptive Win32 types (`WPARAM`, `LPARAM`, `c_ssize_t`), eliminating 64-bit integer overflow errors.
-* **Native Windows 10 & 11 UI:** Direct integration with Common Controls v6 (`comctl32.dll`) for an authentic OS appearance without custom theme emulation.
+* **Native Windows 10 & 11 Controls:** Standard Windows controls via Common Controls v6 (`comctl32.dll`); no custom widget set and no skinning engine. A small `theme` module only unifies surface colors (light canvas `#F3F3F3`, white control surfaces) and applies the Explorer visual style. There is no dark mode, because classic Win32 controls have no documented dark-mode API.
 
 ### Supported Environments
 
@@ -75,6 +75,30 @@ win.run()
 
 ```
 
+### Status and Limits
+
+* Alpha (`0.1.x`): the public API may still change.
+* Windows only, by design. There is no cross-platform abstraction and none is planned.
+* The performance figures above are targets, not measurements. Benchmarks are pending.
+* The listed Windows versions are the target environment, not a tested matrix. ARM64 is untested.
+
+### Tests
+
+The test suites are plain `unittest` modules and run on Windows only (they create real windows):
+
+```bash
+python -m unittest discover -s tests -p "verify_*.py" -v
+```
+
+A manually triggered GitHub Actions workflow (`.github/workflows/tests.yml`) runs the same command on `windows-latest`.
+
+### Examples
+
+* `examples/01_minimal_window.py`: window, controls, callbacks
+* `examples/02_layout_showcase.py`: box layout (`VBox`, `HBox`)
+* `examples/03_choice_controls.py`: `ComboBox`, `ListBox`, message boxes
+* `examples/04_triage_tool.py`: larger demo application with native file pickers
+
 ### License
 
 Distributed under the MIT License. See [LICENSE.md](LICENSE.md) for details.
@@ -91,11 +115,11 @@ Konzipiert für Systemadministration, digitale Forensik, Incident Response, OT/S
 
 ### Kernmerkmale
 
-* **Keine externen Abhängigkeiten (`dependencies = []`):** Ausschließlich auf Basis der Python-Standardbibliothek realisiert. Keine Third-Party-Wheels, keine MSVC-Runtimes, kein WebView2.
+* **Keine Laufzeit-Abhängigkeiten (`dependencies = []`):** Ausschließlich auf Basis der Python-Standardbibliothek realisiert. Keine Third-Party-Wheels, keine MSVC-Runtimes, kein WebView2. (`flit_core` wird nur zum Bauen des Pakets benötigt.)
 * **Minimaler Ressourcenverbrauch:** Zielkorridor unter 15 MB RAM im Leerlauf und Kaltstarts unter 15 Millisekunden (Benchmarks ausstehend auf Win10 x86/x64).
-* **Maximale Supply-Chain-Sicherheit:** Keine externen Pakete bedeuten null Fremdschwachstellen (CVEs). Vollständig auditierbar für Air-Gapped- und KRITIS-Umgebungen.
+* **Überschaubare Lieferkette:** Keine Laufzeit-Abhängigkeiten außer Python selbst und den Windows-Systembibliotheken, also keine CVEs fremder Pakete zu verfolgen. Der Code ist klein genug, um ihn für Air-Gapped- und abgesicherte Netze zu prüfen.
 * **Moderne Python 3.11+ Basis:** Durchgehend typisiert mit pointer-adaptiven Win32-Typen (`WPARAM`, `LPARAM`, `c_ssize_t`) zur Vermeidung von 64-Bit-Überläufen.
-* **Authentische Windows 10 & 11 Optik:** Direkte Nutzung der Windows Common Controls v6 (`comctl32.dll`) für ein natives Erscheinungsbild ohne künstliche Themes.
+* **Native Windows 10 & 11 Controls:** Standard-Steuerelemente über die Common Controls v6 (`comctl32.dll`), kein eigener Widget-Satz und keine Skinning-Engine. Ein kleines `theme`-Modul vereinheitlicht nur die Flächenfarben (helle Fläche `#F3F3F3`, weiße Steuerelemente) und setzt den Explorer-Visual-Style. Einen Dunkelmodus gibt es nicht, weil klassische Win32-Controls keine dokumentierte Dark-Mode-API haben.
 
 ### Unterstützte Plattformen
 
@@ -143,6 +167,30 @@ Button(win, text="Scan starten", pos=(20, 60), on_click=lambda: print("Scanning.
 win.run()
 
 ```
+
+### Stand und Grenzen
+
+* Alpha (`0.1.x`): Die öffentliche API kann sich noch ändern.
+* Nur Windows, bewusst. Es gibt keine Plattform-Abstraktion und es ist keine geplant.
+* Die Leistungswerte oben sind Zielwerte, keine Messungen. Die Benchmarks stehen aus.
+* Die genannten Windows-Versionen sind die Zielumgebung, keine getestete Matrix. ARM64 ist ungetestet.
+
+### Tests
+
+Die Testsuiten sind einfache `unittest`-Module und laufen nur unter Windows (sie erzeugen echte Fenster):
+
+```bash
+python -m unittest discover -s tests -p "verify_*.py" -v
+```
+
+Ein manuell startbarer GitHub-Actions-Workflow (`.github/workflows/tests.yml`) führt denselben Befehl auf `windows-latest` aus.
+
+### Beispiele
+
+* `examples/01_minimal_window.py`: Fenster, Steuerelemente, Callbacks
+* `examples/02_layout_showcase.py`: Box-Layout (`VBox`, `HBox`)
+* `examples/03_choice_controls.py`: `ComboBox`, `ListBox`, Meldungsfenster
+* `examples/04_triage_tool.py`: größere Demo-Anwendung mit nativen Dateidialogen
 
 ### Lizenz
 

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- README sections for status and limits, test instructions, and the example list (English and German).
+- Manually triggered GitHub Actions workflow that runs the test suites on `windows-latest`.
+
+### Changed
+
+- Version is now defined once in `barewingui.__version__` (`0.1.11`); `pyproject.toml` reads it dynamically. Both previously reported `0.1.0`.
+- README, specification, and HTML reference now describe the `theme` module (added in 0.1.10) accurately instead of claiming there is no theming, state the performance figures as unmeasured targets, and replace the "zero CVEs" claim with a statement about runtime dependencies.
+
 ## [0.1.11] - 2026-09-19
 
 ### Added

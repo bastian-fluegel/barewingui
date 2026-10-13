@@ -2,7 +2,7 @@
 
 ## 1. Project Identity & Philosophy
 * **Name:** BareWinGUI (`barewingui`)
-* **Objective:** Ultra-lightweight, deterministic Windows GUI framework built directly on native Win32 APIs.
+* **Objective:** Lightweight, deterministic Windows GUI framework built directly on native Win32 APIs.
 * **Core Principle:** *Zero-Dependency.* Absolute elimination of third-party wheels, C++ runtime dependencies, and web engines.
 * **Target Audience:** Systems administration, incident response, OT/SCADA human-machine interfaces, digital forensics, and hardened enterprise networks.
 
@@ -17,12 +17,12 @@
 * **Pointer Adaptability:** Zero hardcoded pointer widths. Messages and handles must adapt dynamically via `ctypes.c_ssize_t`, `wintypes.WPARAM`, `wintypes.LPARAM`, and `wintypes.HWND`.
 * **Resource Safety (RAII):** Every allocated OS handle (`HWND`, `HDC`, `HGDIOBJ`, `PIDL`) must be tied to a predictable lifecycle and destroyed deterministically (`DestroyWindow`, `DeleteDC`, `DeleteObject`, `CoTaskMemFree`). Top-level windows and controls are released via context manager or explicit `destroy()` / `close()` — never from `__del__` (Win32 thread affinity). `HFONT` from `CreateFontW` is released via `atexit`.
 * **Garbage Collector Anchoring:** Window procedure function pointers (`WNDPROC`) must remain referenced in memory for the lifespan of the window to prevent silent fatal access violations.
-* **Look & Feel:** No proprietary theme engines or CSS emulators. Controls render strictly via native Windows Common Controls v6 (`comctl32.dll`) using current system typography (`Segoe UI`).
+* **Look & Feel:** Controls are native Windows Common Controls v6 (`comctl32.dll`) using current system typography (`Segoe UI`). No proprietary theme engine, no skinning, no CSS emulation. The `theme` module only sets uniform surface colors (canvas `#F3F3F3`, controls white, text `#111111`) through `WM_CTLCOLOR*` handling and applies the Explorer visual style (`SetWindowTheme`). Dark mode is not supported (no documented API for classic controls).
 
 ## 4. Non-Goals
 * No cross-platform abstraction (no Linux, no macOS).
 * No web/DOM runtimes.
-* No custom skinning or legacy OS theme emulation.
+* No custom skinning and no emulation of legacy or foreign OS themes.
 * No backward compatibility for end-of-life Python releases (< 3.11).
 
 ## 5. Performance Budget

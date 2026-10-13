@@ -47,7 +47,7 @@ from barewingui.dialogs import (
 from barewingui.layout import Box, HBox, VBox
 from barewingui.window import Window
 
-__version__ = "0.1.0"
+__version__ = "0.1.11"
 
 __all__ = [
     "Application",

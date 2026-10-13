@@ -3,7 +3,7 @@ barewingui.theme
 ~~~~~~~~~~~~~~~~
 Sysinternals-style Windows 11 light surfaces and Explorer theming.
 
-Win32 has no native Dark Mode. BareWinGUI therefore uses a consistent
+Classic Win32 controls have no documented dark-mode API. BareWinGUI therefore uses a consistent
 light canvas (#F3F3F3), white control surfaces, and SetWindowTheme("Explorer").
 """
 
