@@ -19,9 +19,9 @@ Hinweis: Nach README, Changelog und pyproject.toml erstellt; Code und Tests wurd
 - [ ] Repo-Beschreibung und Topics auf GitHub setzen (python, win32, ctypes, gui, windows)
 
 ## 2. Mittel (halber Tag)
-- [ ] CI: Workflow nicht nur manuell, sondern bei Push und Pull Request
-- [ ] CI: Matrix Python 3.11, 3.12, 3.13 auf `windows-latest` (x64); x86 über `setup-python` mit `architecture: x86`
-- [ ] Tests auf pytest umstellen (`verify_*.py` bleiben als Smoke-Tests oder werden Tests)
+- [x] CI: Workflow bei Push und Pull Request (Branch `rewrite/beta-core`, noch nicht gelaufen)
+- [x] CI: Matrix Python 3.11 bis 3.13 auf `windows-latest` (x64) plus 3.12 x86, dazu Logik-Tests auf Linux (noch nicht gelaufen)
+- [x] Tests laufen mit `unittest` (keine Entwicklungsabhängigkeit, passt zu „keine Abhängigkeiten“); pytest ist nicht nötig
 - [ ] Ruff und mypy in pyproject konfigurieren, in CI laufen lassen
 - [ ] Benchmarks real auf Windows messen (RAM im Leerlauf, Kaltstart), Werte in README eintragen oder Zahlen streichen
 - [ ] `SECURITY.md` (Meldeweg), Issue-Vorlagen, kurzes `CONTRIBUTING.md`

@@ -1,127 +1,118 @@
 """
 barewingui.window
 ~~~~~~~~~~~~~~~~~
-Native Win32 window implementation with RAII lifecycle management,
-GC-safe WNDPROC anchoring, and type-safe event dispatching.
+Top-level window: native HWND, DIP sizes, per-monitor DPI changes and the
+connection to the layout engine.
 """
 
 from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Self
+from typing import Callable
 
-from barewingui.constants import (
-    ShowWindowCmd,
-    StockObject,
-    SysColor,
-    WindowLong,
-    WindowStyle,
-    WindowStyleEx,
-    WM,
-)
-from barewingui.core import Application, apply_window_chrome
-from barewingui.theme import (
-    erase_background,
-    paint_button,
-    paint_edit,
-    paint_static,
-    window_brush,
-)
-from barewingui.types import (
-    LONG_PTR,
-    LPARAM,
-    LRESULT,
-    WPARAM,
-    WNDCLASSEXW,
-    WNDPROC,
-    GetWindowLongPtrW,
-    SetWindowLongPtrW,
-    kernel32,
-    user32,
-)
+from barewingui import _api
+from barewingui._api import kernel32, user32
+from barewingui._layout_core import Container, Node, Rect
+from barewingui.app import App
+from barewingui.dpi import BASE_DPI, Scale
+from barewingui.errors import LayoutError
 
-if TYPE_CHECKING:
-    from barewingui.controls.base import Control
-
-# Standard-Windows-Konstanten für Fensterpositionierung
-CW_USEDEFAULT: int = -0x80000000
-IDC_ARROW = ctypes.c_wchar_p(32512)
+_CLASS_NAME = "BareWinGUI.Window"
+_window_proc_ptr = None  # keeps the C callback alive
 
 
-def _loword(val: int) -> int:
-    return val & 0xFFFF
-
-
-def _hiword(val: int) -> int:
-    return (val >> 16) & 0xFFFF
-
-
-def _to_lresult(value: object) -> int:
-    """
-    ctypes-WNDPROC darf nur einen Python-int zurückgeben.
-    Ein ctypes-Skalar (z. B. c_longlong / LRESULT) löst
-    „object cannot be interpreted as an integer“ aus.
-    """
-    if value is None:
+def _window_proc(hwnd: int, msg: int, wparam: int, lparam: int) -> int:
+    """Single native window procedure: finds the Python Window and forwards the message."""
+    app = App._instance
+    try:
+        if app is not None:
+            if msg == _api.WM_NCCREATE:
+                _bind(app, hwnd, lparam)
+            window = app._windows.get(hwnd)
+            if window is not None:
+                handled, result = window._dispatch(msg, wparam, lparam)
+                if handled:
+                    return result
+    except BaseException as exc:  # noqa: BLE001 - must not escape into native code
+        if app is not None:
+            app.errors.capture(exc)
         return 0
-    if isinstance(value, int):
-        return value
-    raw = getattr(value, "value", value)
-    if raw is None:
-        return 0
-    return raw if isinstance(raw, int) else int(raw)
+    return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
 
-class Window:
+def _bind(app: App, hwnd: int, lparam: int) -> None:
+    """Connect a freshly created HWND to the Window that asked for it (via lpCreateParams)."""
+    create = ctypes.cast(lparam, ctypes.POINTER(_api.CREATESTRUCTW)).contents
+    window = app._pending.pop(create.lpCreateParams or 0, None)
+    if window is not None:
+        window._hwnd = hwnd
+        app._windows[hwnd] = window
+
+
+class Window(Container):
     """
-    Kapselt ein natives Win32-Top-Level-Fenster (HWND) inklusive Message-Dispatching,
-    automatischem Handle-Cleanup (RAII) und Callback-Verankerung.
-    """
+    A top-level window.
 
-    _CLASS_NAME: ClassVar[str] = "BareWinGUI_Window"
-    _class_registered: ClassVar[bool] = False
-    _wndproc_anchor: ClassVar[WNDPROC | None] = None
-    _active_windows: ClassVar[dict[int, Window]] = {}
-    _pending_window: ClassVar[Window | None] = None
+    Sizes are DIPs and describe the *client area*. Use it as a context manager
+    to collect its content; it takes exactly one root container::
+
+        with Window("Demo", size=(480, 240)) as win:
+            with VBox(padding=12):
+                ...
+        App().run()
+
+    :param title: caption text.
+    :param size: client size ``(width, height)`` in DIPs.
+    :param resizable: whether the user can resize the window.
+    """
 
     def __init__(
         self,
-        title: str = "BareWinGUI Application",
-        width: int = 800,
-        height: int = 600,
-        x: int = CW_USEDEFAULT,
-        y: int = CW_USEDEFAULT,
-        style: WindowStyle = WindowStyle.OVERLAPPEDWINDOW,
-        ex_style: WindowStyleEx = WindowStyleEx.APPWINDOW | WindowStyleEx.CONTROLPARENT,
+        title: str = "",
+        size: tuple[int, int] = (640, 480),
+        *,
+        resizable: bool = True,
     ) -> None:
+        if len(size) != 2 or size[0] <= 0 or size[1] <= 0:
+            raise ValueError(f"size must be (width, height) with positive values, got {size!r}")
+        self._app = App.current()
         self._title = title
-        self._width = width
-        self._height = height
-        self._x = x
-        self._y = y
-        self._style = style
-        self._ex_style = ex_style
+        self._hwnd: int | None = None
+        self._dpi = BASE_DPI
+        self._root: Node | None = None
+        self._shown = False
+        self._style = _api.WS_OVERLAPPEDWINDOW | _api.WS_CLIPCHILDREN
+        if not resizable:
+            self._style &= ~(_api.WS_THICKFRAME | _api.WS_MAXIMIZEBOX)
+        self._ex_style = _api.WS_EX_CONTROLPARENT
 
-        self._hwnd: wintypes.HWND | None = None
-        self._controls: dict[int, Control] = {}
-        self._next_control_id: int = 1000
-
-        # Event-Hooks für Anwendungslogik
         self.on_close: Callable[[], bool | None] | None = None
         self.on_destroy: Callable[[], None] | None = None
         self.on_resize: Callable[[int, int], None] | None = None
-        self.on_command: Callable[[int, int, int], None] | None = None
 
-        Application.initialize()
-        self._ensure_class_registered()
-        self._create_native_window()
+        self._create()
+        self._set_client_size(size)
+
+    # -- properties ----------------------------------------------------------
+    @property
+    def hwnd(self) -> int:
+        if self._hwnd is None:
+            raise RuntimeError("the window has been destroyed")
+        return self._hwnd
 
     @property
-    def hwnd(self) -> wintypes.HWND:
-        if self._hwnd is None:
-            raise RuntimeError("Fenster wurde nicht initialisiert oder zerstört.")
-        return self._hwnd
+    def alive(self) -> bool:
+        return self._hwnd is not None
+
+    @property
+    def dpi(self) -> int:
+        """DPI of the monitor the window is on (96 = 100 %)."""
+        return self._dpi
+
+    @property
+    def scale(self) -> Scale:
+        return Scale(self._dpi)
 
     @property
     def title(self) -> str:
@@ -133,197 +124,159 @@ class Window:
         if self._hwnd:
             user32.SetWindowTextW(self._hwnd, value)
 
-    @classmethod
-    def _ensure_class_registered(cls) -> None:
-        """Registriert die WNDCLASSEXW-Struktur einmalig pro Prozess."""
-        if cls._class_registered:
-            return
+    @property
+    def size(self) -> tuple[int, int]:
+        """Client size in DIPs."""
+        w, h = self._client_px()
+        scale = self.scale
+        return round(scale.dip(w)), round(scale.dip(h))
 
-        # Dauerhafte Referenz hält den C-Funktionszeiger im Speicher gegen GC-Löschung
-        cls._wndproc_anchor = WNDPROC(cls._static_wnd_proc)
+    @size.setter
+    def size(self, value: tuple[int, int]) -> None:
+        self._set_client_size(value)
 
-        h_instance = kernel32.GetModuleHandleW(None)
-        h_cursor = user32.LoadCursorW(None, IDC_ARROW)
-        h_brush = window_brush() or user32.GetSysColorBrush(SysColor.WINDOW)
-
-        wcex = WNDCLASSEXW()
-        wcex.cbSize = ctypes.sizeof(WNDCLASSEXW)
-        wcex.style = 0x0002 | 0x0001  # CS_HREDRAW | CS_VREDRAW
-        wcex.lpfnWndProc = cls._wndproc_anchor
-        wcex.cbClsExtra = 0
-        wcex.cbWndExtra = 0
-        wcex.hInstance = h_instance
-        wcex.hIcon = None
-        wcex.hCursor = h_cursor
-        wcex.hbrBackground = h_brush
-        wcex.lpszMenuName = None
-        wcex.lpszClassName = cls._CLASS_NAME
-        wcex.hIconSm = None
-
-        atom = user32.RegisterClassExW(ctypes.byref(wcex))
-        if not atom:
-            err = kernel32.GetLastError()
-            # 1410 = ERROR_CLASS_ALREADY_EXISTS
-            if err != 1410:
-                raise RuntimeError(f"Konnte Fensterklasse nicht registrieren (Fehler {err})")
-
-        cls._class_registered = True
-
-    def _create_native_window(self) -> None:
-        """Erzeugt das Betriebssystem-Fenster und verdrahtet die Instanz."""
-        h_instance = kernel32.GetModuleHandleW(None)
-        Window._pending_window = self
-
-        hwnd = user32.CreateWindowExW(
-            int(self._ex_style) | int(WindowStyleEx.CONTROLPARENT),
-            self._CLASS_NAME,
-            self._title,
-            int(self._style),
-            self._x,
-            self._y,
-            self._width,
-            self._height,
-            None,
-            None,
-            h_instance,
-            None,
-        )
-
-        Window._pending_window = None
-
-        if not hwnd:
-            raise RuntimeError(
-                f"CreateWindowExW fehlgeschlagen (Fehler {kernel32.GetLastError()})"
+    # -- content -------------------------------------------------------------
+    def add(self, node: Node) -> Node:
+        """Set the root container (called automatically for the first container in ``with``)."""
+        if self._root is not None:
+            raise LayoutError(
+                "a Window takes exactly one root container; put further content into a VBox/HBox"
             )
+        self._root = node
+        return node
 
-        self._hwnd = hwnd
-        self._active_windows[hwnd] = self
-        SetWindowLongPtrW(hwnd, int(WindowLong.USERDATA), LONG_PTR(hwnd))
-        apply_window_chrome(hwnd)
+    def relayout(self) -> None:
+        """Place the root container to fill the client area."""
+        if self._hwnd is None or self._root is None:
+            return
+        w, h = self._client_px()
+        self._root.place(Rect(0, 0, w, h), self.scale)
 
-    @staticmethod
-    def _static_wnd_proc(
-        hwnd: wintypes.HWND, msg: int, wparam: WPARAM, lparam: LPARAM
-    ) -> LRESULT:
-        """Zentraler Win32-Router: Leitet Systemnachrichten an das Zielobjekt."""
-        win = Window._active_windows.get(hwnd)
-
-        # Abfangen während der Erstellungsphase
-        if win is None and Window._pending_window is not None:
-            win = Window._pending_window
-            win._hwnd = hwnd
-            Window._active_windows[hwnd] = win
-
-        if win is not None:
-            return _to_lresult(win._handle_message(hwnd, msg, wparam, lparam))
-
-        return _to_lresult(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
-
-    def _handle_message(
-        self, hwnd: wintypes.HWND, msg: int, wparam: WPARAM, lparam: LPARAM
-    ) -> LRESULT:
-        """Instanzspezifische Nachrichtenverarbeitung."""
-        match msg:
-            case WM.CLOSE:
-                if self.on_close:
-                    should_close = self.on_close()
-                    if should_close is False:
-                        return 0
-                self.destroy()
-                return 0
-
-            case WM.DESTROY:
-                # Fenster sauber aus Registry austragen
-                if hwnd in self._active_windows:
-                    del self._active_windows[hwnd]
-                self._hwnd = None
-
-                if self.on_destroy:
-                    self.on_destroy()
-
-                # Wenn kein Fenster mehr aktiv ist, Message-Loop beenden und Python freigeben
-                if not self._active_windows:
-                    user32.PostQuitMessage(0)
-                return 0
-
-            case WM.SIZE:
-                new_width = _loword(lparam)
-                new_height = _hiword(lparam)
-                self._width = new_width
-                self._height = new_height
-                if self.on_resize:
-                    self.on_resize(new_width, new_height)
-                return 0
-
-            case WM.COMMAND:
-                control_id = _loword(wparam)
-                notification_code = _hiword(wparam)
-                control = self._controls.get(control_id)
-                if control is not None:
-                    control._handle_command(notification_code)
-                if self.on_command:
-                    self.on_command(control_id, notification_code, lparam)
-                return 0
-
-            case WM.ERASEBKGND:
-                hdc = wintypes.HDC(wparam)
-                if erase_background(hwnd, hdc):
-                    return 1
-
-            case WM.CTLCOLORSTATIC:
-                hdc = wintypes.HDC(wparam)
-                return _to_lresult(paint_static(hdc, wintypes.HWND(lparam)))
-
-            case WM.CTLCOLOREDIT | WM.CTLCOLORLISTBOX:
-                hdc = wintypes.HDC(wparam)
-                return _to_lresult(paint_edit(hdc))
-
-            case WM.CTLCOLORBTN:
-                hdc = wintypes.HDC(wparam)
-                return _to_lresult(paint_button(hdc))
-
-        return _to_lresult(user32.DefWindowProcW(hwnd, msg, wparam, lparam))
-
-    def destroy(self) -> None:
-        """Zerstört das native HWND deterministisch (RAII)."""
+    # -- lifecycle -----------------------------------------------------------
+    def show(self) -> None:
         if self._hwnd:
-            hwnd_to_destroy = self._hwnd
-            # Child-HWNDs werden mit dem Parent zerstört — Python-Refs entkoppeln
-            for control in self._controls.values():
-                control._hwnd = None
-            # Erst Windows zerstören lassen (löst synchron WM_DESTROY aus), danach Nullen
-            user32.DestroyWindow(hwnd_to_destroy)
-            self._hwnd = None
-
-    def register_control(self, control: Control) -> int:
-        """Registriert ein Child-Control und vergibt eine fortlaufende ID."""
-        control_id = self._next_control_id
-        self._next_control_id += 1
-        self._controls[control_id] = control
-        return control_id
-
-    def show(self, cmd: ShowWindowCmd = ShowWindowCmd.SHOWNORMAL) -> None:
-        """Macht das Fenster sichtbar und erzwingt den ersten Render-Pass."""
-        if self._hwnd:
-            user32.ShowWindow(self._hwnd, int(cmd))
+            self._shown = True
+            self.relayout()
+            user32.ShowWindow(self._hwnd, _api.SW_SHOW)
             user32.UpdateWindow(self._hwnd)
 
     def hide(self) -> None:
-        """Versteckt das Fenster."""
         if self._hwnd:
-            user32.ShowWindow(self._hwnd, int(ShowWindowCmd.HIDE))
+            user32.ShowWindow(self._hwnd, _api.SW_HIDE)
 
     def close(self) -> None:
-        """Sendet ein WM_CLOSE an das Fenster."""
+        """Ask the window to close (like the X button; ``on_close`` may veto). Thread-safe."""
         if self._hwnd:
-            user32.PostMessageW(self._hwnd, int(WM.CLOSE), 0, 0)
+            user32.PostMessageW(self._hwnd, _api.WM_CLOSE, 0, 0)
 
-    def run(self) -> int:
-        """Startet die Message-Pumpe der Application für dieses Fenster."""
-        return Application.run(self)
+    def destroy(self) -> None:
+        """Destroy the native window immediately (UI thread only)."""
+        if self._hwnd:
+            user32.DestroyWindow(self._hwnd)
 
-    def __enter__(self) -> Self:
-        return self
+    # -- internals -----------------------------------------------------------
+    def _show_if_unseen(self) -> None:
+        if not self._shown:
+            self.show()
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        self.destroy()
+    def _create(self) -> None:
+        app = self._app
+        key = app._next_key
+        app._next_key += 1
+        app._pending[key] = self
+        try:
+            global _window_proc_ptr
+            if _window_proc_ptr is None:
+                _window_proc_ptr = _api.WNDPROC(_window_proc)
+            _api.register_window_class(
+                _CLASS_NAME, _window_proc_ptr, background=_api.COLOR_BTNFACE + 1
+            )
+            hwnd = user32.CreateWindowExW(
+                self._ex_style, _CLASS_NAME, self._title, self._style,
+                _api.CW_USEDEFAULT, _api.CW_USEDEFAULT, _api.CW_USEDEFAULT, _api.CW_USEDEFAULT,
+                None, None, kernel32.GetModuleHandleW(None), key,
+            )
+            if not hwnd:
+                raise _api.last_error("CreateWindowExW")
+        finally:
+            app._pending.pop(key, None)
+        if self._hwnd != hwnd:  # WM_NCCREATE normally did this already
+            self._hwnd = hwnd
+            app._windows[hwnd] = self
+        dpi = user32.GetDpiForWindow(hwnd)
+        self._dpi = dpi or BASE_DPI
+
+    def _client_px(self) -> tuple[int, int]:
+        rc = wintypes.RECT()
+        if self._hwnd and user32.GetClientRect(self._hwnd, ctypes.byref(rc)):
+            return rc.right - rc.left, rc.bottom - rc.top
+        return 0, 0
+
+    def _outer_px(self, client_w: int, client_h: int) -> tuple[int, int]:
+        """Outer window size in pixels that yields the given client size at the current DPI."""
+        rc = wintypes.RECT(0, 0, client_w, client_h)
+        if not user32.AdjustWindowRectExForDpi(
+            ctypes.byref(rc), self._style, False, self._ex_style, self._dpi
+        ):
+            raise _api.last_error("AdjustWindowRectExForDpi")
+        return rc.right - rc.left, rc.bottom - rc.top
+
+    def _set_client_size(self, size_dip: tuple[int, int]) -> None:
+        scale = self.scale
+        outer_w, outer_h = self._outer_px(scale.px(size_dip[0]), scale.px(size_dip[1]))
+        user32.SetWindowPos(
+            self.hwnd, None, 0, 0, outer_w, outer_h,
+            _api.SWP_NOMOVE | _api.SWP_NOZORDER | _api.SWP_NOACTIVATE,
+        )
+
+    def _dispatch(self, msg: int, wparam: int, lparam: int) -> tuple[bool, int]:
+        """Handle one message. Returns ``(handled, result)``; unhandled goes to DefWindowProc."""
+        if msg == _api.WM_SIZE:
+            if wparam != _api.SIZE_MINIMIZED:
+                self.relayout()
+                if self.on_resize is not None:
+                    self.on_resize(*self.size)
+            return True, 0
+
+        if msg == _api.WM_DPICHANGED:
+            self._dpi = wparam & 0xFFFF
+            suggested = ctypes.cast(lparam, ctypes.POINTER(wintypes.RECT)).contents
+            user32.SetWindowPos(
+                self.hwnd, None, suggested.left, suggested.top,
+                suggested.right - suggested.left, suggested.bottom - suggested.top,
+                _api.SWP_NOZORDER | _api.SWP_NOACTIVATE,
+            )
+            self.relayout()
+            return True, 0
+
+        if msg == _api.WM_GETMINMAXINFO:
+            if self._root is not None:
+                info = ctypes.cast(lparam, ctypes.POINTER(_api.MINMAXINFO)).contents
+                need = self._root.min_size(self.scale)
+                outer_w, outer_h = self._outer_px(need.w, need.h)
+                info.ptMinTrackSize.x = outer_w
+                info.ptMinTrackSize.y = outer_h
+                return True, 0
+            return False, 0
+
+        if msg == _api.WM_CLOSE:
+            if self.on_close is not None and self.on_close() is False:
+                return True, 0
+            self.destroy()
+            return True, 0
+
+        if msg == _api.WM_DESTROY:
+            if self.on_destroy is not None:
+                self.on_destroy()
+            return False, 0
+
+        if msg == _api.WM_NCDESTROY:
+            hwnd, self._hwnd = self._hwnd, None
+            app = self._app
+            if hwnd is not None:
+                app._windows.pop(hwnd, None)
+            if app._running and not app._windows:
+                user32.PostQuitMessage(0)
+            return False, 0
+
+        return False, 0

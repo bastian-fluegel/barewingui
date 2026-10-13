@@ -1,221 +1,288 @@
 """
 barewingui.layout
 ~~~~~~~~~~~~~~~~~
-Lightweight box-sizer layout engine (VBox / HBox) for automatic,
-resolution-independent control positioning and resizing without fixed coordinates.
+Flexbox-style stacks: :class:`VBox`, :class:`HBox` and :class:`Spacer`.
+
+Layout is two-pass. Each child reports its natural size; the stack then
+distributes the remaining space by ``grow`` (or takes back a deficit by
+``shrink``). All options are in DIPs and scale with the monitor DPI.
+
+Containers are context managers; anything created inside the ``with`` block
+is added to the innermost open container::
+
+    with VBox(padding=12, gap=8):
+        name = TextBox()
+        with HBox(justify="end"):
+            Button("OK")
 """
 
 from __future__ import annotations
 
-import ctypes
-from ctypes import wintypes
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, Self
+import math
+from typing import NamedTuple
 
-from barewingui.types import user32
+from barewingui._layout_core import (
+    ALIGNS,
+    DIRECTIONS,
+    JUSTIFIES,
+    Align,
+    Container,
+    Direction,
+    Flex,
+    Insets,
+    Justify,
+    Node,
+    Rect,
+    Size,
+    adopt,
+    resolve_flex,
+)
+from barewingui.dpi import Scale
+from barewingui.errors import LayoutError
 
-if TYPE_CHECKING:
-    from barewingui.controls.base import Control
-    from barewingui.window import Window
+__all__ = ["Stack", "VBox", "HBox", "Spacer", "Flex", "Size", "Rect"]
 
 
-@dataclass
-class _LayoutItem:
-    target: Control | Box | None
-    stretch: int = 0
-    fixed_size: int | None = None
+class _Spec(NamedTuple):
+    base: int
+    lo: int
+    hi: float
+    explicit: bool
 
 
-class Box:
+def _spec(flex: Flex, natural: int, node_min: int, width_axis: bool, scale: Scale) -> _Spec:
+    """Resolve one axis of one child: base size, bounds and whether it was set explicitly."""
+    if width_axis:
+        explicit, lo_f, hi_f = flex.width, flex.min_width, flex.max_width
+    else:
+        explicit, lo_f, hi_f = flex.height, flex.min_height, flex.max_height
+    base = scale.px(explicit) if explicit is not None else natural
+    lo = scale.px(lo_f) if lo_f is not None else min(node_min, base)
+    hi: float = scale.px(hi_f) if hi_f is not None else math.inf
+    hi = max(hi, lo)  # a minimum always wins over a maximum
+    base = int(min(max(base, lo), hi))
+    return _Spec(base, lo, hi, explicit is not None)
+
+
+class Stack(Container):
     """
-    Eindimensionaler Layout-Container für vertikale oder horizontale Anordnung.
-    Unterstützt Verschachtelung, automatischen Dehnungsfaktor (Stretch), feste Abstände
-    und Fenster-Resizing.
+    Lays children out in one direction.
+
+    :param direction: ``"vertical"`` or ``"horizontal"``.
+    :param gap: space between children (DIPs).
+    :param padding: inner padding (DIPs): number, ``(vertical, horizontal)``
+        or ``(top, right, bottom, left)``.
+    :param justify: placement along the main axis when no child grows:
+        ``start``, ``center``, ``end`` or ``space_between``.
+    :param align: default placement across the main axis:
+        ``start``, ``center``, ``end`` or ``stretch``.
+    :param flex: options for this stack as a child of its parent
+        (``grow``, ``shrink``, ``width``, ``height``, ``min_*``, ``max_*``, ``align_self``).
     """
 
     def __init__(
         self,
-        orientation: Literal["vertical", "horizontal"] = "vertical",
-        spacing: int = 8,
-        padding: int | tuple[int, int] | tuple[int, int, int, int] = 10,
-        fixed_size: int | None = None,
+        direction: Direction = "vertical",
+        *,
+        gap: float = 8,
+        padding: float | tuple[float, ...] = 0,
+        justify: Justify = "start",
+        align: Align = "stretch",
+        **flex: object,
     ) -> None:
-        self.orientation = orientation
-        self.spacing = spacing
-        self.fixed_size = fixed_size
-        self._items: list[_LayoutItem] = []
-        self._window: Window | None = None
+        if direction not in DIRECTIONS:
+            raise LayoutError(f"direction must be one of {sorted(DIRECTIONS)}, got {direction!r}")
+        if justify not in JUSTIFIES:
+            raise LayoutError(f"justify must be one of {sorted(JUSTIFIES)}, got {justify!r}")
+        if align not in ALIGNS:
+            raise LayoutError(f"align must be one of {sorted(ALIGNS)}, got {align!r}")
+        if gap < 0:
+            raise LayoutError("gap must not be negative")
+        self.direction: Direction = direction
+        self.gap = gap
+        self.padding = Insets.parse(padding)
+        self.justify: Justify = justify
+        self.align: Align = align
+        self.flex = Flex(**flex)  # type: ignore[arg-type]
+        self.visible = True
+        self._children: list[Node] = []
+        adopt(self)
 
-        # Padding normalisieren auf (top, right, bottom, left)
-        if isinstance(padding, int):
-            self.pad_top = self.pad_right = self.pad_bottom = self.pad_left = padding
-        elif len(padding) == 2:
-            self.pad_left = self.pad_right = padding[0]
-            self.pad_top = self.pad_bottom = padding[1]
-        elif len(padding) == 4:
-            self.pad_top, self.pad_right, self.pad_bottom, self.pad_left = padding
-        else:
-            raise ValueError("Padding muss ein int, 2er- oder 4er-Tupel sein.")
+    # -- children ------------------------------------------------------------
+    @property
+    def children(self) -> tuple[Node, ...]:
+        return tuple(self._children)
 
-    def add(
-        self,
-        item: Control | Box,
-        stretch: int = 0,
-        fixed_size: int | None = None,
-    ) -> Self:
-        """
-        Fügt ein Steuerelement oder eine untergeordnete Box hinzu.
+    def add(self, node: Node) -> Node:
+        """Append a child. Called automatically for nodes created inside ``with``."""
+        if node is self or any(node is c for c in self._children):
+            raise LayoutError("node is already part of this container")
+        self._children.append(node)
+        attached = getattr(node, "_attached", None)
+        if attached is not None:
+            attached(self)
+        return node
 
-        :param item: Ein Control oder eine verschachtelte Box.
-        :param stretch: Dehnungsfaktor (> 0 nimmt verfügbaren Leerraum proportional ein).
-        :param fixed_size: Feste Ausdehnung entlang der Hauptachse (ignoriert Control-Größe).
-        """
-        if stretch == 0 and fixed_size is None:
-            if isinstance(item, Box) and item.fixed_size is not None:
-                fixed_size = item.fixed_size
-            elif hasattr(item, "size"):
-                measured = item.size[1] if self.orientation == "vertical" else item.size[0]
-                if measured > 0:
-                    fixed_size = measured
+    def remove(self, node: Node) -> None:
+        for i, child in enumerate(self._children):
+            if child is node:
+                del self._children[i]
+                return
+        raise LayoutError("node is not part of this container")
 
-        self._items.append(_LayoutItem(target=item, stretch=stretch, fixed_size=fixed_size))
-        return self
+    # -- measuring -----------------------------------------------------------
+    def _horizontal(self) -> bool:
+        return self.direction == "horizontal"
 
-    def add_spacing(self, pixels: int) -> Self:
-        """Fügt einen starren Leerraum (Spacer) entlang der Hauptachse ein."""
-        self._items.append(_LayoutItem(target=None, stretch=0, fixed_size=pixels))
-        return self
+    def _padding_px(self, scale: Scale) -> tuple[int, int, int, int]:
+        p = self.padding
+        return scale.px(p.top), scale.px(p.right), scale.px(p.bottom), scale.px(p.left)
 
-    def add_stretch(self, factor: int = 1) -> Self:
-        """Fügt eine elastische Feder ein, die den Leerraum dynamisch verdrängt."""
-        self._items.append(_LayoutItem(target=None, stretch=factor, fixed_size=None))
-        return self
+    def _measure(self, scale: Scale) -> tuple[list[Node], list[_Spec], list[_Spec]]:
+        """Visible children with their main-axis and cross-axis specs."""
+        horizontal = self._horizontal()
+        kids = [c for c in self._children if c.visible]
+        mains: list[_Spec] = []
+        crosses: list[_Spec] = []
+        for child in kids:
+            nat = child.natural_size(scale)
+            mn = child.min_size(scale)
+            n_main, n_cross = (nat.w, nat.h) if horizontal else (nat.h, nat.w)
+            m_main, m_cross = (mn.w, mn.h) if horizontal else (mn.h, mn.w)
+            mains.append(_spec(child.flex, n_main, m_main, horizontal, scale))
+            crosses.append(_spec(child.flex, n_cross, m_cross, not horizontal, scale))
+        return kids, mains, crosses
 
-    def apply(self, x: int, y: int, width: int, height: int) -> None:
-        """Berechnet alle Abmessungen neu und aktualisiert die nativen HWND-Positionen."""
-        if not self._items:
-            return
+    def _size(self, scale: Scale, use_min: bool) -> Size:
+        top, right, bottom, left = self._padding_px(scale)
+        pad_w, pad_h = left + right, top + bottom
+        _, mains, crosses = self._measure(scale)
+        if not mains:
+            return Size(pad_w, pad_h)
+        gaps = scale.px(self.gap) * (len(mains) - 1)
+        main = sum((s.lo if use_min else s.base) for s in mains) + gaps
+        cross = max((s.lo if use_min else s.base) for s in crosses)
+        if self._horizontal():
+            return Size(main + pad_w, cross + pad_h)
+        return Size(cross + pad_w, main + pad_h)
 
-        is_vertical = self.orientation == "vertical"
+    def natural_size(self, scale: Scale) -> Size:
+        return self._size(scale, use_min=False)
 
-        avail_w = max(0, width - self.pad_left - self.pad_right)
-        avail_h = max(0, height - self.pad_top - self.pad_bottom)
-        main_avail = avail_h if is_vertical else avail_w
-        cross_avail = avail_w if is_vertical else avail_h
+    def min_size(self, scale: Scale) -> Size:
+        return self._size(scale, use_min=True)
 
-        # Zwischenabstände zwischen den Elementen abziehen
-        visible_gaps = max(0, len(self._items) - 1) * self.spacing
-        main_remaining = max(0, main_avail - visible_gaps)
+    # -- placing -------------------------------------------------------------
+    def arrange(self, rect: Rect, scale: Scale) -> list[tuple[Node, Rect]]:
+        """Compute the rectangle of every visible child inside ``rect`` (no side effects)."""
+        top, right, bottom, left = self._padding_px(scale)
+        inner_x, inner_y = rect.x + left, rect.y + top
+        inner_w = max(0, rect.w - left - right)
+        inner_h = max(0, rect.h - top - bottom)
 
-        total_stretch = 0
-        allocated_sizes: list[int] = []
+        kids, mains, crosses = self._measure(scale)
+        if not kids:
+            return []
 
-        # 1. Pass: Feste Größen ermitteln
-        for item in self._items:
-            if item.stretch > 0:
-                total_stretch += item.stretch
-                allocated_sizes.append(0)
-            else:
-                size = 24
-                if item.fixed_size is not None:
-                    size = item.fixed_size
-                elif item.target is None:
-                    size = 0
-                elif isinstance(item.target, Box):
-                    size = item.target.fixed_size or 24
-                else:
-                    # Control: Höhe bei VBox, Breite bei HBox übernehmen
-                    size = item.target.size[1] if is_vertical else item.target.size[0]
+        horizontal = self._horizontal()
+        main_inner, cross_inner = (inner_w, inner_h) if horizontal else (inner_h, inner_w)
+        main_start, cross_start = (inner_x, inner_y) if horizontal else (inner_y, inner_x)
 
-                size = min(main_remaining, size)
-                main_remaining -= size
-                allocated_sizes.append(size)
-
-        # 2. Pass: Verbleibenden Raum auf Stretch-Elemente verteilen
-        if total_stretch > 0 and main_remaining > 0:
-            for i, item in enumerate(self._items):
-                if item.stretch > 0:
-                    share = int(main_remaining * (item.stretch / total_stretch))
-                    allocated_sizes[i] = share
-
-        # 3. Pass: Positionierung durchführen
-        curr_main = (y + self.pad_top) if is_vertical else (x + self.pad_left)
-
-        for i, item in enumerate(self._items):
-            item_size = allocated_sizes[i]
-
-            if is_vertical:
-                item_x = x + self.pad_left
-                item_y = curr_main
-                item_w = cross_avail
-                item_h = item_size
-            else:
-                item_x = curr_main
-                item_y = y + self.pad_top
-                item_w = item_size
-                item_h = cross_avail
-
-            if item.target is not None:
-                if isinstance(item.target, Box):
-                    item.target.apply(item_x, item_y, item_w, item_h)
-                else:
-                    item.target.move(x=item_x, y=item_y, width=item_w, height=item_h)
-
-            curr_main += item_size + self.spacing
-
-    def attach(self, window: Window) -> None:
-        """Verbindet das Layout mit einem Fenster und aktiviert automatisches Resize-Handling."""
-        self._window = window
-
-        def _on_window_resize(w: int, h: int) -> None:
-            self.apply(0, 0, w, h)
-
-        # Bestehenden Callback verketten
-        prev_callback = window.on_resize
-
-        def _resize_chain(w: int, h: int) -> None:
-            if prev_callback:
-                prev_callback(w, h)
-            _on_window_resize(w, h)
-
-        window.on_resize = _resize_chain
-
-        # Initialen Layout-Durchlauf erzwingen
-        if window.hwnd:
-            rc = wintypes.RECT()
-            user32.GetClientRect(window.hwnd, ctypes.byref(rc))
-            self.apply(0, 0, rc.right - rc.left, rc.bottom - rc.top)
-
-
-class VBox(Box):
-    """Vertikaler Stapelcontainer (Ordnet Steuerelemente von oben nach unten an)."""
-
-    def __init__(
-        self,
-        spacing: int = 8,
-        padding: int | tuple[int, int] | tuple[int, int, int, int] = 10,
-        fixed_size: int | None = None,
-    ) -> None:
-        super().__init__(
-            orientation="vertical",
-            spacing=spacing,
-            padding=padding,
-            fixed_size=fixed_size,
+        n = len(kids)
+        gap = scale.px(self.gap)
+        sizes = resolve_flex(
+            [s.base for s in mains],
+            [s.lo for s in mains],
+            [s.hi for s in mains],
+            [k.flex.grow for k in kids],
+            [k.flex.shrink for k in kids],
+            main_inner - gap * (n - 1),
         )
 
+        gaps = [gap] * (n - 1)
+        cursor = main_start
+        leftover = main_inner - (sum(sizes) + gap * (n - 1))
+        if leftover > 0:
+            if self.justify == "center":
+                cursor += leftover // 2
+            elif self.justify == "end":
+                cursor += leftover
+            elif self.justify == "space_between" and n > 1:
+                per, rem = divmod(leftover, n - 1)
+                gaps = [gap + per + (1 if i < rem else 0) for i in range(n - 1)]
 
-class HBox(Box):
-    """Horizontaler Stapelcontainer (Ordnet Steuerelemente von links nach rechts an)."""
+        result: list[tuple[Node, Rect]] = []
+        for i, child in enumerate(kids):
+            cspec = crosses[i]
+            align = child.flex.align_self or self.align
+            if align == "stretch" and not cspec.explicit:
+                csize = int(min(max(cross_inner, cspec.lo), cspec.hi))
+            else:
+                csize = cspec.base
+            if align == "center":
+                cpos = max(0, (cross_inner - csize) // 2)
+            elif align == "end":
+                cpos = max(0, cross_inner - csize)
+            else:
+                cpos = 0
+            if horizontal:
+                child_rect = Rect(cursor, cross_start + cpos, sizes[i], csize)
+            else:
+                child_rect = Rect(cross_start + cpos, cursor, csize, sizes[i])
+            result.append((child, child_rect))
+            cursor += sizes[i] + (gaps[i] if i < n - 1 else 0)
+        return result
+
+    def place(self, rect: Rect, scale: Scale) -> None:
+        for child, child_rect in self.arrange(rect, scale):
+            child.place(child_rect, scale)
+
+
+class VBox(Stack):
+    """Children from top to bottom."""
+
+    def __init__(self, **options: object) -> None:
+        super().__init__("vertical", **options)  # type: ignore[arg-type]
+
+
+class HBox(Stack):
+    """Children from left to right."""
+
+    def __init__(self, **options: object) -> None:
+        super().__init__("horizontal", **options)  # type: ignore[arg-type]
+
+
+class Spacer:
+    """
+    Empty space inside a stack.
+
+    ``Spacer()`` grows to fill all free space (pushes neighbours apart).
+    ``Spacer(16)`` is a fixed gap of 16 DIPs along the stack's main axis.
+    """
 
     def __init__(
-        self,
-        spacing: int = 8,
-        padding: int | tuple[int, int] | tuple[int, int, int, int] = 10,
-        fixed_size: int | None = None,
+        self, size: float | None = None, *, grow: float | None = None, **flex: object
     ) -> None:
-        super().__init__(
-            orientation="horizontal",
-            spacing=spacing,
-            padding=padding,
-            fixed_size=fixed_size,
-        )
+        if size is not None and size < 0:
+            raise LayoutError("spacer size must not be negative")
+        if size is None and grow is None:
+            grow = 1.0
+        flex.setdefault("shrink", 0.0 if size is not None else 1.0)
+        self._size = size
+        self.flex = Flex(grow=grow or 0.0, **flex)  # type: ignore[arg-type]
+        self.visible = True
+        adopt(self)
+
+    def _attached(self, parent: object) -> None:
+        if self._size is not None:
+            horizontal = getattr(parent, "direction", "vertical") == "horizontal"
+            setattr(self.flex, "width" if horizontal else "height", self._size)
+
+    def natural_size(self, scale: Scale) -> Size:
+        return Size(0, 0)
+
+    def min_size(self, scale: Scale) -> Size:
+        return Size(0, 0)
+
+    def place(self, rect: Rect, scale: Scale) -> None:
+        return None

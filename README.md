@@ -3,6 +3,9 @@
 <a id="document-title"></a>
 # BareWinGUI
 
+> **Work in progress:** this branch rebuilds BareWinGUI for 0.2.0 (see `docs/ZIELBILD.md`). The examples below describe the old API and will be replaced with the controls port.
+
+
 **Deterministic, zero-dependency native Win32 GUI framework for Python.**
 
 [🇬🇧 Switch to English](#barewingui-en) • [🇩🇪 Zu Deutsch wechseln](#barewingui-de)

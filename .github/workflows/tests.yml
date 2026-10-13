@@ -1,15 +1,17 @@
 name: tests
 
-# Manual trigger only until the first runs on windows-latest are confirmed green.
 on:
+  push:
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  verify:
-    runs-on: windows-latest
+  logic:
+    # Pure-Python parts (layout engine, scaling, dispatch) on every platform.
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -22,5 +24,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Run test suites
-        run: python -m unittest discover -s tests -p "verify_*.py" -v
+      - run: python -m compileall -q barewingui
+      - run: python -m unittest discover -s tests -v
+
+  windows:
+    # The same suite plus the Win32 smoke tests (real windows, real message loop).
+    runs-on: windows-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+        architecture: ["x64"]
+        include:
+          - python-version: "3.12"
+            architecture: "x86"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: ${{ matrix.architecture }}
+      - run: python -m unittest discover -s tests -v

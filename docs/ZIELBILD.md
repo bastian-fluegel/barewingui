@@ -52,7 +52,7 @@ Zweistufig wie Flexbox, mit der Einfachheit der Swift-Stacks:
 2. **Verteilen:** Der Container verteilt den Rest nach `grow` und `shrink`.
 
 - Container: `VBox`, `HBox`, später `Grid`. Optionen: `gap`, `padding`, `justify` (start, center, end, space-between), `align` (start, center, end, stretch).
-- Kinder: `grow` (Standard 0), `shrink` (Standard 1), `width`/`height`, `min_*`/`max_*`, `align`.
+- Kinder: `grow` (Standard 0), `shrink` (Standard 1), `width`/`height`, `min_*`/`max_*`, `align_self`.
 - `Spacer()` füllt freien Platz.
 - Natürliche Größen bleiben bei Resize erhalten, es wird nie unter die Mindestgröße gequetscht.
 
@@ -73,8 +73,8 @@ Beta gilt als erreicht, wenn:
 5. `pip install barewingui` funktioniert (PyPI), Tag und Release `0.2.0-beta` stehen.
 
 ## Arbeitspakete (je Branch, mit Tests, Doku, Changelog)
-1. Kern: App, Ereignisschleife, DPI, `invoke`, Fehlerbehandlung
-2. Layout-Engine (Messen/Verteilen, Spacer, Grid)
+1. Kern: App, Ereignisschleife, DPI, `invoke`, Fehlerbehandlung (Code geschrieben, Windows-Lauf ausstehend)
+2. Layout-Engine (Messen/Verteilen, Spacer; Grid später) (fertig, getestet)
 3. Standard-Controls
 4. Common Controls
 5. Menü, Statusleiste, Tastenkürzel, Timer

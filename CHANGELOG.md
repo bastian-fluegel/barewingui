@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_Rewrite towards 0.2.0 on branch `rewrite/beta-core`._
+
 ### Added
+
+- `App`: one per run, message loop, `invoke`/`call` for other threads; errors in callbacks
+  are re-raised by `run()` or passed to `App.on_error`.
+- Per-monitor DPI v2, sizes in DIPs, `WM_DPICHANGED` handling, minimum window size taken
+  from the layout.
+- Flexbox-style layout engine: `VBox`, `HBox`, `Stack`, `Spacer` with `grow`, `shrink`,
+  `gap`, `padding`, `justify`, `align`, `min_*`/`max_*`, built with `with` blocks.
+- All Win32 prototypes live in `barewingui._api` and are mandatory; DLLs load lazily, so the
+  package imports on every platform.
+- Tests with `unittest`: layout, scaling and dispatch on every platform, Win32 smoke tests
+  on Windows. CI runs on push and pull request.
+
+### Removed
+
+- Controls, dialogs, the old layout and the theme module are removed for the rewrite and
+  will be ported. BareWinGUI no longer draws anything itself.
+
+### Added (earlier, unreleased)
 
 - README sections for status and limits, test instructions, and the example list (English and German).
 - Manually triggered GitHub Actions workflow that runs the test suites on `windows-latest`.
