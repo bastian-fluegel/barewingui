@@ -47,4 +47,18 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.architecture }}
-      - run: python -m unittest discover -s tests -v
+      - name: Run tests
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -v *> test-output.txt
+          $code = $LASTEXITCODE
+          Get-Content test-output.txt | Select-Object -Last 120
+          # Make the result readable without downloading logs (job summary + annotation).
+          '```' | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          Get-Content test-output.txt | Select-Object -Last 120 | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          '```' | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          if ($code -ne 0) {
+            $text = (Get-Content test-output.txt | Select-Object -Last 60) -join '%0A'
+            Write-Output "::error title=unittest failed::$text"
+          }
+          exit $code
