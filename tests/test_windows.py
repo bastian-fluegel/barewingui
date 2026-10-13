@@ -126,7 +126,7 @@ class WindowsTests(unittest.TestCase):
                 a = Probe(50, 20)
                 b = Probe(50, 20, grow=1)
         scale = win.scale
-        pad, gap = scale.px(10), scale.px(8)
+        pad, gap, h_a = scale.px(10), scale.px(8), scale.px(20)
         cw, ch = win._client_px()
         later(self.app, 0.2, setattr, win, "size", (400, 300))
         snapshot = {}
@@ -138,10 +138,10 @@ class WindowsTests(unittest.TestCase):
         later(self.app, 0.1, lambda: first.update(a=a.rect, b=b.rect))
         self.app.run()
 
-        self.assertEqual(first["a"], Rect(pad, pad, cw - 2 * pad, 20))
-        self.assertEqual(first["b"], Rect(pad, pad + 20 + gap, cw - 2 * pad, ch - 2 * pad - 40 - gap))
+        self.assertEqual(first["a"], Rect(pad, pad, cw - 2 * pad, h_a))
+        self.assertEqual(first["b"], Rect(pad, pad + h_a + gap, cw - 2 * pad, ch - 2 * pad - h_a - gap))
         cw2, ch2 = scale.px(400), scale.px(300)
-        self.assertEqual(snapshot["b"], Rect(pad, pad + 20 + gap, cw2 - 2 * pad, ch2 - 2 * pad - 40 - gap))
+        self.assertEqual(snapshot["b"], Rect(pad, pad + h_a + gap, cw2 - 2 * pad, ch2 - 2 * pad - h_a - gap))
 
     def test_a_window_takes_one_root_container(self):
         with Window("root") as win:
