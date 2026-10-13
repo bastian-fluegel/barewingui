@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
-from typing import Callable
+from typing import Any, Callable
 
 from barewingui import _api
 from barewingui._api import kernel32, user32
@@ -20,6 +20,7 @@ from barewingui.errors import LayoutError
 
 _CLASS_NAME = "BareWinGUI.Window"
 _window_proc_ptr = None  # keeps the C callback alive
+_PTR_MASK = (1 << (8 * ctypes.sizeof(ctypes.c_void_p))) - 1
 
 
 def _window_proc(hwnd: int, msg: int, wparam: int, lparam: int) -> int:
@@ -81,6 +82,9 @@ class Window(Container):
         self._hwnd: int | None = None
         self._dpi = BASE_DPI
         self._root: Node | None = None
+        self._controls: dict[int, Any] = {}  # control HWND -> control
+        self.default_button: Any = None
+        self._last_control: Any = None
         self._shown = False
         self._style = _api.WS_OVERLAPPEDWINDOW | _api.WS_CLIPCHILDREN
         if not resizable:
@@ -143,6 +147,10 @@ class Window(Container):
                 "a Window takes exactly one root container; put further content into a VBox/HBox"
             )
         self._root = node
+        try:
+            node._parent = self  # type: ignore[attr-defined]
+        except AttributeError:
+            pass
         return node
 
     def relayout(self) -> None:
@@ -246,8 +254,21 @@ class Window(Container):
                 suggested.right - suggested.left, suggested.bottom - suggested.top,
                 _api.SWP_NOZORDER | _api.SWP_NOACTIVATE,
             )
+            for control in list(self._controls.values()):
+                control._dpi_changed(self._dpi)
             self.relayout()
             return True, 0
+
+        if msg == _api.WM_COMMAND:
+            if lparam:
+                control = self._controls.get(lparam & _PTR_MASK)
+                if control is not None:
+                    control._command((wparam >> 16) & 0xFFFF)
+                    return True, 0
+            elif (wparam & 0xFFFF) == _api.IDOK and self.default_button is not None:
+                self.default_button.click()  # Enter pressed inside a text box
+                return True, 0
+            return False, 0
 
         if msg == _api.WM_GETMINMAXINFO:
             if self._root is not None:
@@ -272,6 +293,8 @@ class Window(Container):
 
         if msg == _api.WM_NCDESTROY:
             hwnd, self._hwnd = self._hwnd, None
+            self._controls.clear()
+            self.default_button = None
             app = self._app
             if hwnd is not None:
                 app._windows.pop(hwnd, None)

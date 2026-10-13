@@ -105,6 +105,7 @@ class Stack(Container):
         self.align: Align = align
         self.flex = Flex(**flex)  # type: ignore[arg-type]
         self.visible = True
+        self._parent: object | None = None
         self._children: list[Node] = []
         adopt(self)
 
@@ -118,6 +119,10 @@ class Stack(Container):
         if node is self or any(node is c for c in self._children):
             raise LayoutError("node is already part of this container")
         self._children.append(node)
+        try:
+            node._parent = self  # type: ignore[attr-defined]
+        except AttributeError:  # nodes with __slots__ may refuse; they just have no parent link
+            pass
         attached = getattr(node, "_attached", None)
         if attached is not None:
             attached(self)

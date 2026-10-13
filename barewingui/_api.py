@@ -69,6 +69,87 @@ ERROR_CLASS_ALREADY_EXISTS = 1410
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4
 HWND_MESSAGE = -3
 
+# ---------------------------------------------------------------------------
+# Child controls
+# ---------------------------------------------------------------------------
+WM_SETFONT = 0x0030
+WM_COMMAND = 0x0111
+
+WS_CHILD = 0x40000000
+WS_VISIBLE = 0x10000000
+WS_CLIPSIBLINGS = 0x04000000
+WS_TABSTOP = 0x00010000
+WS_GROUP = 0x00020000
+WS_VSCROLL = 0x00200000
+WS_EX_CLIENTEDGE = 0x00000200
+
+IDOK = 1
+
+BS_PUSHBUTTON = 0x00
+BS_DEFPUSHBUTTON = 0x01
+BS_AUTO3STATE = 0x06
+BS_AUTOCHECKBOX = 0x03
+BS_GROUPBOX = 0x07
+BS_AUTORADIOBUTTON = 0x09
+BM_GETCHECK = 0x00F0
+BM_SETCHECK = 0x00F1
+BM_CLICK = 0x00F5
+BST_UNCHECKED, BST_CHECKED, BST_INDETERMINATE = 0, 1, 2
+BN_CLICKED = 0
+
+SS_LEFT = 0x00
+SS_NOPREFIX = 0x80
+
+ES_MULTILINE = 0x0004
+ES_PASSWORD = 0x0020
+ES_AUTOVSCROLL = 0x0040
+ES_AUTOHSCROLL = 0x0080
+ES_READONLY = 0x0800
+ES_WANTRETURN = 0x1000
+EN_CHANGE = 0x0300
+EM_SETSEL = 0x00B1
+EM_SETREADONLY = 0x00CF
+EM_SETCUEBANNER = 0x1501
+
+CBS_DROPDOWN = 0x0002
+CBS_DROPDOWNLIST = 0x0003
+CBS_AUTOHSCROLL = 0x0040
+CB_ERR = -1
+CB_GETCOUNT = 0x0146
+CB_GETCURSEL = 0x0147
+CB_GETLBTEXT = 0x0148
+CB_GETLBTEXTLEN = 0x0149
+CB_ADDSTRING = 0x0143
+CB_DELETESTRING = 0x0144
+CB_INSERTSTRING = 0x014A
+CB_RESETCONTENT = 0x014B
+CB_SETCURSEL = 0x014E
+CB_SETMINVISIBLE = 0x1701
+CBN_SELCHANGE = 1
+CBN_EDITCHANGE = 5
+
+LBS_NOTIFY = 0x0001
+LBS_NOINTEGRALHEIGHT = 0x0100
+LBS_EXTENDEDSEL = 0x0800
+LB_ERR = -1
+LB_ADDSTRING = 0x0180
+LB_INSERTSTRING = 0x0181
+LB_DELETESTRING = 0x0182
+LB_RESETCONTENT = 0x0184
+LB_SETSEL = 0x0185
+LB_SETCURSEL = 0x0186
+LB_GETSEL = 0x0187
+LB_GETCURSEL = 0x0188
+LB_GETTEXT = 0x0189
+LB_GETTEXTLEN = 0x018A
+LB_GETCOUNT = 0x018B
+LB_GETSELCOUNT = 0x0190
+LB_GETSELITEMS = 0x0191
+LBN_SELCHANGE = 1
+LBN_DBLCLK = 2
+
+SPI_GETNONCLIENTMETRICS = 0x0029
+
 
 # ---------------------------------------------------------------------------
 # Structures
@@ -132,6 +213,46 @@ class ACTCTXW(ctypes.Structure):
         ("lpResourceName", wintypes.LPCWSTR),
         ("lpApplicationName", wintypes.LPCWSTR),
         ("hModule", wintypes.HMODULE),
+    ]
+
+
+class LOGFONTW(ctypes.Structure):
+    _fields_ = [
+        ("lfHeight", wintypes.LONG),
+        ("lfWidth", wintypes.LONG),
+        ("lfEscapement", wintypes.LONG),
+        ("lfOrientation", wintypes.LONG),
+        ("lfWeight", wintypes.LONG),
+        ("lfItalic", wintypes.BYTE),
+        ("lfUnderline", wintypes.BYTE),
+        ("lfStrikeOut", wintypes.BYTE),
+        ("lfCharSet", wintypes.BYTE),
+        ("lfOutPrecision", wintypes.BYTE),
+        ("lfClipPrecision", wintypes.BYTE),
+        ("lfQuality", wintypes.BYTE),
+        ("lfPitchAndFamily", wintypes.BYTE),
+        ("lfFaceName", wintypes.WCHAR * 32),
+    ]
+
+
+class NONCLIENTMETRICSW(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.UINT),
+        ("iBorderWidth", ctypes.c_int),
+        ("iScrollWidth", ctypes.c_int),
+        ("iScrollHeight", ctypes.c_int),
+        ("iCaptionWidth", ctypes.c_int),
+        ("iCaptionHeight", ctypes.c_int),
+        ("lfCaptionFont", LOGFONTW),
+        ("iSmCaptionWidth", ctypes.c_int),
+        ("iSmCaptionHeight", ctypes.c_int),
+        ("lfSmCaptionFont", LOGFONTW),
+        ("iMenuWidth", ctypes.c_int),
+        ("iMenuHeight", ctypes.c_int),
+        ("lfMenuFont", LOGFONTW),
+        ("lfStatusFont", LOGFONTW),
+        ("lfMessageFont", LOGFONTW),
+        ("iPaddedBorderWidth", ctypes.c_int),
     ]
 
 
@@ -212,6 +333,17 @@ user32 = _Library(
         "PostMessageW": (_BOOL, [HWND, _UINT, WPARAM, LPARAM]),
         "PostQuitMessage": (None, [_INT]),
         "GetAncestor": (HWND, [HWND, _UINT]),
+        "SendMessageW": (LRESULT, [HWND, _UINT, WPARAM, LPARAM]),
+        "GetWindowTextLengthW": (_INT, [HWND]),
+        "GetWindowTextW": (_INT, [HWND, wintypes.LPWSTR, _INT]),
+        "EnableWindow": (_BOOL, [HWND, _BOOL]),
+        "IsWindowEnabled": (_BOOL, [HWND]),
+        "SetFocus": (HWND, [HWND]),
+        "GetDC": (wintypes.HDC, [HWND]),
+        "ReleaseDC": (_INT, [HWND, wintypes.HDC]),
+        "SystemParametersInfoForDpi": (
+            _BOOL, [_UINT, _UINT, ctypes.c_void_p, _UINT, _UINT],
+        ),
     },
 )
 
@@ -223,6 +355,16 @@ kernel32 = _Library(
         "ActivateActCtx": (_BOOL, [wintypes.HANDLE, _P(ULONG_PTR)]),
         "DeactivateActCtx": (_BOOL, [_DWORD, ULONG_PTR]),
         "ReleaseActCtx": (None, [wintypes.HANDLE]),
+    },
+)
+
+gdi32 = _Library(
+    "gdi32",
+    {
+        "CreateFontIndirectW": (wintypes.HFONT, [_P(LOGFONTW)]),
+        "DeleteObject": (_BOOL, [wintypes.HGDIOBJ]),
+        "SelectObject": (wintypes.HGDIOBJ, [wintypes.HDC, wintypes.HGDIOBJ]),
+        "GetTextExtentPoint32W": (_BOOL, [wintypes.HDC, wintypes.LPCWSTR, _INT, _P(wintypes.SIZE)]),
     },
 )
 
