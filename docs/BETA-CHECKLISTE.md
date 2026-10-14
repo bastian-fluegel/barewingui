@@ -5,15 +5,15 @@ Hinweis: Nach README, Changelog und pyproject.toml erstellt; Code und Tests wurd
 
 ## Beta-Definition (festlegen, bevor es losgeht)
 - [ ] Kern-API ist benannt und stabil; was wackelt, steht als „experimentell" in der Doku
-- [ ] Tests laufen automatisch in CI auf Windows
+- [x] Tests laufen automatisch in CI auf Windows
 - [ ] Installation per `pip install barewingui` (PyPI)
-- [ ] Bekannte Grenzen sind dokumentiert
-- [ ] Classifier in pyproject: `Development Status :: 4 - Beta`
+- [x] Bekannte Grenzen sind dokumentiert (README)
+- [x] Classifier in pyproject: `Development Status :: 4 - Beta`
 
 ## 1. Schnell (je unter 1 Stunde)
 - [ ] Prüfen, ob die „Unreleased"-Änderungen (README Status/Limits, Workflow, CVE-Text) gepusht sind (`git status`, `git push`)
 - [ ] Stand `0.1.11` mit Tag `v0.1.11` und GitHub-Release markieren
-- [ ] README: „Window (Preview)" streichen, Fenster gilt seit 0.1.2
+- [x] README: „Window (Preview)" streichen, Fenster gilt seit 0.1.2
 - [ ] README: Positionierung auf „reines GUI-Projekt" umstellen (Forensik/OT/SCADA/KRITIS auf eine Zeile „Eignet sich z. B. für"), Demos neutral benennen
 - [ ] README: sauberen Screenshot einer neutralen Demo-App einbauen (Win+Shift+S, kein Handyfoto)
 - [ ] Repo-Beschreibung und Topics auf GitHub setzen (python, win32, ctypes, gui, windows)
@@ -32,7 +32,7 @@ Hinweis: Nach README, Changelog und pyproject.toml erstellt; Code und Tests wurd
 - [ ] DPI-Awareness (Manifest, Skalierung bei Monitorwechsel) prüfen und dokumentieren
 - [ ] Unicode und IME (Eingabe in TextInput) testen
 - [ ] API-Referenz aus den Docstrings erzeugen oder `docs/reference.html` auf Stand bringen
-- [ ] Beispiele auf neutralen Satz bringen (Hello, Layout, Formular, Auswahl, Dialoge)
+- [x] Beispiele auf neutralen Satz bringen (fünf Beispiel-Apps in `examples/`)
 
 ## 4. Veröffentlichung
 - [ ] Probelauf auf TestPyPI (Trusted Publishing über GitHub Actions)

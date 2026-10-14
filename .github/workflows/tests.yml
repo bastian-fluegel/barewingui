@@ -26,6 +26,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m compileall -q barewingui
       - run: python -m unittest discover -s tests -v
+      - name: Package builds
+        run: |
+          python -m pip install build
+          python -m build
+          python -m pip install dist/*.whl
+          python -c "import barewingui; print(barewingui.__version__)"
 
   windows:
     # The same suite plus the Win32 smoke tests (real windows, real message loop).
