@@ -69,7 +69,7 @@ class TabPage(Stack):
         template = _dialog_template()
         hwnd = user32.CreateDialogIndirectParamW(
             kernel32.GetModuleHandleW(None), ctypes.addressof(template),
-            tabs._parent_hwnd, _page_proc_ptr, 0,
+            tabs.hwnd, _page_proc_ptr, 0,  # a child of the tab control, like in WinForms
         )
         if not hwnd:
             raise _api.last_error("CreateDialogIndirectParamW")
@@ -79,10 +79,9 @@ class TabPage(Stack):
         super().__init__("vertical", padding=padding, gap=gap, **options)  # type: ignore[arg-type]
 
     def place(self, rect: Rect, scale: Scale) -> None:
-        # No SWP_NOZORDER: the page must stay on top of its tab control (hWndInsertAfter
-        # None is HWND_TOP), otherwise the tab control paints its body over the page.
         user32.SetWindowPos(
-            self._page_hwnd, None, rect.x, rect.y, rect.w, rect.h, _api.SWP_NOACTIVATE,
+            self._page_hwnd, None, rect.x, rect.y, rect.w, rect.h,
+            _api.SWP_NOZORDER | _api.SWP_NOACTIVATE,
         )
         super().place(Rect(0, 0, rect.w, rect.h), scale)  # children are relative to the page
 
@@ -100,7 +99,8 @@ class TabControl(Control, Container):
     def __init__(self, *, on_change: Handler | None = None, **options: object) -> None:
         super().__init__(**options)  # type: ignore[arg-type]
         self._pages: list[TabPage] = []
-        self._create("SysTabControl32", "", _api.WS_TABSTOP)
+        # The pages are children of the tab control: clipping and repainting then work as usual.
+        self._create("SysTabControl32", "", _api.WS_TABSTOP | _api.WS_CLIPCHILDREN, _api.WS_EX_CONTROLPARENT)
         if on_change is not None:
             self.on_change(on_change)
 
@@ -152,7 +152,7 @@ class TabControl(Control, Container):
             user32.ShowWindow(page._page_hwnd, _api.SW_SHOW if shown else _api.SW_HIDE)
         # repaint everything behind and in the pages (no stale pixels of the old page)
         user32.RedrawWindow(
-            self._parent_hwnd, None, None,
+            self.hwnd, None, None,
             _api.RDW_INVALIDATE | _api.RDW_ERASE | _api.RDW_ALLCHILDREN | _api.RDW_UPDATENOW,
         )
 
@@ -185,7 +185,8 @@ class TabControl(Control, Container):
             return
         rc = wintypes.RECT(0, 0, rect.w, rect.h)
         self._send(_api.TCM_ADJUSTRECT, 0, ctypes.addressof(rc))  # display area, tab-client coordinates
-        area = Rect(rect.x + rc.left, rect.y + rc.top, max(0, rc.right - rc.left), max(0, rc.bottom - rc.top))
+        # pages are children of the tab control: tab-client coordinates, not window coordinates
+        area = Rect(rc.left, rc.top, max(0, rc.right - rc.left), max(0, rc.bottom - rc.top))
         for page in self._pages:
             page.place(area, scale)
 

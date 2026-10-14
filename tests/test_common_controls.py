@@ -327,15 +327,13 @@ class ViewControlTests(unittest.TestCase):
         self.assertTrue(t.top < g.top and g.bottom <= t.bottom)
         n = rect_of(name)
         self.assertTrue(g.left <= n.left and n.right <= g.right)
-        # z-order: the pages are above the tab control (else its body paints over them)
+        # the pages are children of the tab control (clipping and repainting then just work)
+        _user32.GetParent.argtypes = [wintypes.HWND]
+        _user32.GetParent.restype = wintypes.HWND
         _user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
         _user32.GetWindow.restype = wintypes.HWND
-        above, node = [], _user32.GetWindow(tabs.hwnd, 3)  # GW_HWNDPREV
-        while node:
-            above.append(node)
-            node = _user32.GetWindow(node, 3)
-        self.assertIn(general._page_hwnd, above)
-        self.assertIn(advanced._page_hwnd, above)
+        self.assertEqual(_user32.GetParent(general._page_hwnd), tabs.hwnd)
+        self.assertEqual(_user32.GetParent(advanced._page_hwnd), tabs.hwnd)
         # and inside the page the group frame is below the control it contains
         node, over_group = _user32.GetWindow(group._hwnd, 3), []
         while node:
