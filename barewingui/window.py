@@ -94,7 +94,9 @@ class Window(Container):
         self.context_menu: Any = None
         self.cancel_button: Any = None
         self._shown = False
-        self._style = _api.WS_OVERLAPPEDWINDOW | _api.WS_CLIPCHILDREN
+        # No WS_CLIPCHILDREN: group boxes do not paint their interior, the window must erase it
+        # (else moved or hidden controls leave stale pixels inside a group).
+        self._style = _api.WS_OVERLAPPEDWINDOW
         if not resizable:
             self._style &= ~(_api.WS_THICKFRAME | _api.WS_MAXIMIZEBOX)
         self._ex_style = _api.WS_EX_CONTROLPARENT

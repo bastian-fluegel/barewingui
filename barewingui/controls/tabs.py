@@ -43,7 +43,8 @@ def _page_proc(hwnd: int, msg: int, wparam: int, lparam: int) -> int:
 
 def _dialog_template() -> ctypes.Array:
     """An empty child-dialog template (DS_CONTROL: themed, tab-navigable tab page)."""
-    style = _api.DS_CONTROL | _api.WS_CHILD | _api.WS_CLIPCHILDREN | _api.WS_CLIPSIBLINGS
+    # No WS_CLIPCHILDREN: group boxes do not paint their interior, the page must erase it.
+    style = _api.DS_CONTROL | _api.WS_CHILD | _api.WS_CLIPSIBLINGS
     data = struct.pack("<IIHhhhhHHH", style, _api.WS_EX_CONTROLPARENT, 0, 0, 0, 0, 0, 0, 0, 0)
     return ctypes.create_string_buffer(data, len(data))
 
