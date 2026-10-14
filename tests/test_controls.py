@@ -1,9 +1,7 @@
 """Native control tests. They only run on Windows (CI: windows-latest)."""
 
 import ctypes
-import sys
 import unittest
-from ctypes import wintypes
 
 from barewingui import (
     App,
@@ -20,28 +18,12 @@ from barewingui import (
     Window,
 )
 
-WINDOWS = sys.platform == "win32"
-
-if WINDOWS:
-    _user32 = ctypes.WinDLL("user32", use_last_error=True)
-    _user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
-    _user32.GetWindowRect.restype = wintypes.BOOL
-    _user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
-    _user32.SendMessageW.restype = ctypes.c_ssize_t
-    _user32.IsWindowEnabled.argtypes = [wintypes.HWND]
-    _user32.IsWindowVisible.argtypes = [wintypes.HWND]
+from winhelpers import WINDOWS, _user32, rect_of
 
 WM_COMMAND = 0x0111
 WM_GETFONT = 0x0031
 BM_CLICK = 0x00F5
 EM_REPLACESEL = 0x00C2
-
-
-def rect_of(control_or_hwnd):
-    hwnd = getattr(control_or_hwnd, "hwnd", control_or_hwnd)
-    rc = wintypes.RECT()
-    assert _user32.GetWindowRect(hwnd, ctypes.byref(rc))
-    return rc
 
 
 def notify(window, control, code):

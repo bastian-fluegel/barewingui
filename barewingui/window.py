@@ -85,6 +85,7 @@ class Window(Container):
         self._controls: dict[int, Any] = {}  # control HWND -> control
         self.default_button: Any = None
         self._last_control: Any = None
+        self._status: Any = None
         self._shown = False
         self._style = _api.WS_OVERLAPPEDWINDOW | _api.WS_CLIPCHILDREN
         if not resizable:
@@ -153,12 +154,18 @@ class Window(Container):
             pass
         return node
 
+    @property
+    def status_bar(self) -> Any:
+        """The window's :class:`StatusBar`, or ``None``."""
+        return self._status
+
     def relayout(self) -> None:
         """Place the root container to fill the client area."""
         if self._hwnd is None or self._root is None:
             return
         w, h = self._client_px()
-        self._root.place(Rect(0, 0, w, h), self.scale)
+        status_h = self._status.reposition(self.scale) if self._status is not None else 0
+        self._root.place(Rect(0, 0, w, max(0, h - status_h)), self.scale)
 
     # -- lifecycle -----------------------------------------------------------
     def show(self) -> None:
@@ -270,11 +277,26 @@ class Window(Container):
                 return True, 0
             return False, 0
 
+        if msg in (_api.WM_HSCROLL, _api.WM_VSCROLL) and lparam:
+            control = self._controls.get(lparam & _PTR_MASK)
+            if control is not None:
+                control._scroll(wparam & 0xFFFF)
+                return True, 0
+            return False, 0
+
+        if msg == _api.WM_NOTIFY and lparam:
+            header = ctypes.cast(lparam, ctypes.POINTER(_api.NMHDR)).contents
+            control = self._controls.get(header.hwndFrom or 0)
+            if control is not None:
+                return True, control._notify(header.code, lparam)
+            return False, 0
+
         if msg == _api.WM_GETMINMAXINFO:
             if self._root is not None:
                 info = ctypes.cast(lparam, ctypes.POINTER(_api.MINMAXINFO)).contents
                 need = self._root.min_size(self.scale)
-                outer_w, outer_h = self._outer_px(need.w, need.h)
+                status_h = self._status.height_px() if self._status is not None else 0
+                outer_w, outer_h = self._outer_px(need.w, need.h + status_h)
                 info.ptMinTrackSize.x = outer_w
                 info.ptMinTrackSize.y = outer_h
                 return True, 0

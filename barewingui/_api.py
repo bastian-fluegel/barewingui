@@ -150,6 +150,121 @@ LBN_DBLCLK = 2
 
 SPI_GETNONCLIENTMETRICS = 0x0029
 
+# ---------------------------------------------------------------------------
+# Common controls (comctl32)
+# ---------------------------------------------------------------------------
+WM_NOTIFY = 0x004E
+WM_HSCROLL = 0x0114
+WM_VSCROLL = 0x0115
+WM_USER = 0x0400
+
+# progress bar
+PBS_SMOOTH = 0x01
+PBS_MARQUEE = 0x08
+PBM_SETPOS = WM_USER + 2
+PBM_GETPOS = WM_USER + 8
+PBM_SETRANGE32 = WM_USER + 6
+PBM_SETMARQUEE = WM_USER + 10
+PBM_SETSTATE = WM_USER + 16
+PBST_NORMAL, PBST_ERROR, PBST_PAUSED = 1, 2, 3
+
+# trackbar
+TBS_AUTOTICKS = 0x0001
+TBS_VERT = 0x0002
+TBS_NOTICKS = 0x0010
+TBM_GETPOS = WM_USER
+TBM_SETPOS = WM_USER + 5
+TBM_SETRANGEMIN = WM_USER + 7
+TBM_SETRANGEMAX = WM_USER + 8
+TBM_SETTICFREQ = WM_USER + 20
+TBM_SETPAGESIZE = WM_USER + 21
+TBM_SETLINESIZE = WM_USER + 23
+TB_ENDTRACK = 8
+
+# up-down (spin box)
+UDM_SETBUDDY = WM_USER + 105
+UDM_SETRANGE32 = WM_USER + 111
+UDM_SETPOS32 = WM_USER + 113
+UDS_SETBUDDYINT = 0x0002
+UDS_ALIGNRIGHT = 0x0004
+UDS_ARROWKEYS = 0x0020
+UDS_NOTHOUSANDS = 0x0080
+ES_NUMBER = 0x2000
+
+# status bar
+SBARS_SIZEGRIP = 0x0100
+SB_SETPARTS = WM_USER + 4
+SB_SETTEXTW = WM_USER + 11
+
+# date/time picker
+DTS_SHORTDATEFORMAT = 0x0000
+DTS_LONGDATEFORMAT = 0x0004
+DTS_TIMEFORMAT = 0x0009
+DTM_GETSYSTEMTIME = 0x1001
+DTM_SETSYSTEMTIME = 0x1002
+DTN_DATETIMECHANGE = -759
+GDT_VALID = 0
+
+# list view
+LVS_REPORT = 0x0001
+LVS_SINGLESEL = 0x0004
+LVS_SHOWSELALWAYS = 0x0008
+LVS_EX_GRIDLINES = 0x00000001
+LVS_EX_FULLROWSELECT = 0x00000020
+LVS_EX_DOUBLEBUFFER = 0x00010000
+LVM_GETITEMCOUNT = 0x1004
+LVM_GETNEXTITEM = 0x100C
+LVM_DELETEITEM = 0x1008
+LVM_DELETEALLITEMS = 0x1009
+LVM_ENSUREVISIBLE = 0x1013
+LVM_SETCOLUMNWIDTH = 0x101E
+LVM_SETITEMSTATE = 0x102B
+LVM_GETSELECTEDCOUNT = 0x1032
+LVM_SETEXTENDEDLISTVIEWSTYLE = 0x1036
+LVM_GETITEMTEXTW = 0x1073
+LVM_SETITEMTEXTW = 0x1074
+LVM_INSERTITEMW = 0x104D
+LVM_INSERTCOLUMNW = 0x1061
+LVNI_SELECTED = 0x0002
+LVIF_TEXT, LVIF_STATE = 0x0001, 0x0008
+LVIS_FOCUSED, LVIS_SELECTED = 0x0001, 0x0002
+LVCF_FMT, LVCF_WIDTH, LVCF_TEXT, LVCF_SUBITEM = 0x0001, 0x0002, 0x0004, 0x0008
+LVCFMT_LEFT, LVCFMT_RIGHT = 0, 1
+LVN_ITEMCHANGED = -101
+LVN_COLUMNCLICK = -108
+LVN_ITEMACTIVATE = -114
+NM_DBLCLK = -3
+
+# tree view
+TVS_HASBUTTONS = 0x0001
+TVS_HASLINES = 0x0002
+TVS_LINESATROOT = 0x0004
+TVS_SHOWSELALWAYS = 0x0020
+TVM_INSERTITEMW = 0x1132
+TVM_DELETEITEM = 0x1101
+TVM_EXPAND = 0x1102
+TVM_GETNEXTITEM = 0x110A
+TVM_SELECTITEM = 0x110B
+TVM_ENSUREVISIBLE = 0x1114
+TVM_GETITEMW = 0x113E
+TVM_SETITEMW = 0x113F
+TVGN_CARET = 9
+TVI_LAST = -0x0FFFE
+TVI_ROOT = -0x10000
+TVIF_TEXT, TVIF_CHILDREN = 0x0001, 0x0040
+TVE_COLLAPSE, TVE_EXPAND = 1, 2
+TVN_SELCHANGEDW = -451
+TVN_ITEMEXPANDINGW = -454
+
+# tab control
+TCM_GETCURSEL = 0x130B
+TCM_SETCURSEL = 0x130C
+TCM_ADJUSTRECT = 0x1328
+TCM_SETITEMW = 0x133D
+TCM_INSERTITEMW = 0x133E
+TCIF_TEXT = 0x0001
+TCN_SELCHANGE = -551
+
 
 # ---------------------------------------------------------------------------
 # Structures
@@ -256,6 +371,106 @@ class NONCLIENTMETRICSW(ctypes.Structure):
     ]
 
 
+class NMHDR(ctypes.Structure):
+    _fields_ = [("hwndFrom", HWND), ("idFrom", ULONG_PTR), ("code", ctypes.c_int)]
+
+
+class SYSTEMTIME(ctypes.Structure):
+    _fields_ = [
+        (name, wintypes.WORD)
+        for name in (
+            "wYear", "wMonth", "wDayOfWeek", "wDay",
+            "wHour", "wMinute", "wSecond", "wMilliseconds",
+        )
+    ]
+
+
+class LVCOLUMNW(ctypes.Structure):
+    _fields_ = [
+        ("mask", wintypes.UINT),
+        ("fmt", ctypes.c_int),
+        ("cx", ctypes.c_int),
+        ("pszText", wintypes.LPWSTR),
+        ("cchTextMax", ctypes.c_int),
+        ("iSubItem", ctypes.c_int),
+        ("iImage", ctypes.c_int),
+        ("iOrder", ctypes.c_int),
+    ]
+
+
+class LVITEMW(ctypes.Structure):
+    _fields_ = [
+        ("mask", wintypes.UINT),
+        ("iItem", ctypes.c_int),
+        ("iSubItem", ctypes.c_int),
+        ("state", wintypes.UINT),
+        ("stateMask", wintypes.UINT),
+        ("pszText", wintypes.LPWSTR),
+        ("cchTextMax", ctypes.c_int),
+        ("iImage", ctypes.c_int),
+        ("lParam", LPARAM),
+        ("iIndent", ctypes.c_int),
+    ]
+
+
+class NMLISTVIEW(ctypes.Structure):
+    _fields_ = [
+        ("hdr", NMHDR),
+        ("iItem", ctypes.c_int),
+        ("iSubItem", ctypes.c_int),
+        ("uNewState", wintypes.UINT),
+        ("uOldState", wintypes.UINT),
+        ("uChanged", wintypes.UINT),
+        ("ptAction", wintypes.POINT),
+        ("lParam", LPARAM),
+    ]
+
+
+class TVITEMW(ctypes.Structure):
+    _fields_ = [
+        ("mask", wintypes.UINT),
+        ("hItem", ctypes.c_void_p),
+        ("state", wintypes.UINT),
+        ("stateMask", wintypes.UINT),
+        ("pszText", wintypes.LPWSTR),
+        ("cchTextMax", ctypes.c_int),
+        ("iImage", ctypes.c_int),
+        ("iSelectedImage", ctypes.c_int),
+        ("cChildren", ctypes.c_int),
+        ("lParam", LPARAM),
+    ]
+
+
+class TVINSERTSTRUCTW(ctypes.Structure):
+    _fields_ = [
+        ("hParent", ctypes.c_void_p),
+        ("hInsertAfter", ctypes.c_void_p),
+        ("item", TVITEMW),
+    ]
+
+
+class NMTREEVIEWW(ctypes.Structure):
+    _fields_ = [
+        ("hdr", NMHDR),
+        ("action", wintypes.UINT),
+        ("itemOld", TVITEMW),
+        ("itemNew", TVITEMW),
+        ("ptDrag", wintypes.POINT),
+    ]
+
+
+class TCITEMW(ctypes.Structure):
+    _fields_ = [
+        ("mask", wintypes.UINT),
+        ("dwState", wintypes.DWORD),
+        ("dwStateMask", wintypes.DWORD),
+        ("pszText", wintypes.LPWSTR),
+        ("cchTextMax", ctypes.c_int),
+        ("iImage", ctypes.c_int),
+        ("lParam", LPARAM),
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Lazy libraries with mandatory prototypes
 # ---------------------------------------------------------------------------
@@ -322,6 +537,7 @@ user32 = _Library(
         "SetWindowTextW": (_BOOL, [HWND, wintypes.LPCWSTR]),
         "SetWindowPos": (_BOOL, [HWND, HWND, _INT, _INT, _INT, _INT, _UINT]),
         "GetClientRect": (_BOOL, [HWND, _P(wintypes.RECT)]),
+        "GetWindowRect": (_BOOL, [HWND, _P(wintypes.RECT)]),
         "AdjustWindowRectExForDpi": (_BOOL, [_P(wintypes.RECT), _DWORD, _BOOL, _DWORD, _UINT]),
         "GetDpiForWindow": (_UINT, [HWND]),
         "SetProcessDpiAwarenessContext": (_BOOL, [ctypes.c_void_p]),

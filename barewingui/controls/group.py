@@ -80,5 +80,20 @@ class GroupBox(Stack):
     def _dpi_changed(self, dpi: int) -> None:
         self._apply_font(dpi)
 
+    # -- native frame events/visibility (tab pages) ----------------------------------
+    _suppressed = 0
+
     def _command(self, code: int) -> None:
         pass
+
+    def _scroll(self, code: int) -> None:
+        pass
+
+    def _notify(self, code: int, lparam: int) -> int:
+        return 0
+
+    def _suppress(self, delta: int) -> None:
+        self._suppressed = max(0, self._suppressed + delta)
+        if self._hwnd:
+            shown = self.visible and not self._suppressed
+            user32.ShowWindow(self._hwnd, _api.SW_SHOW if shown else _api.SW_HIDE)

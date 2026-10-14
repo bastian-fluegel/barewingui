@@ -58,14 +58,20 @@ class Control:
     """
     Base class. Subclasses call :meth:`_create` at the end of their ``__init__``.
 
+    Class attribute ``_in_layout = False`` marks controls that manage their own
+    position (the status bar) and are not part of a layout container.
+
     :param enabled: ``False`` greys the control out.
     :param visible: ``False`` hides it and removes it from the layout.
     :param flex: layout options (``grow``, ``shrink``, ``width``, ``height``,
         ``min_*``, ``max_*``, ``align_self``), sizes in DIPs.
     """
 
+    _in_layout = True
+
     def __init__(self, *, enabled: bool = True, visible: bool = True, **flex: object) -> None:
         self._window = owning_window()
+        self._suppressed = 0  # >0 while the control sits on a hidden tab page
         self._hwnd: int | None = None
         self._font_dpi = 0
         self._visible = bool(visible)
@@ -83,7 +89,7 @@ class Control:
     ) -> None:
         window = self._window
         style |= _api.WS_CHILD | _api.WS_CLIPSIBLINGS
-        if self._visible:
+        if self._visible and not self._suppressed:
             style |= _api.WS_VISIBLE
         hwnd = user32.CreateWindowExW(
             ex_style, win_class, text, style, 0, 0, 0, 0,
@@ -96,8 +102,10 @@ class Control:
         self._apply_font(window.dpi)
         if not self._enabled:
             user32.EnableWindow(hwnd, False)
-        adopt(self)
-        window._last_control = self
+        if self._in_layout:
+            adopt(self)
+            window._last_control = self
+            self._inherit_suppression()
         self._after_create()
         if window._shown:
             window.relayout()
@@ -144,7 +152,7 @@ class Control:
     def enabled(self, value: bool) -> None:
         self._enabled = bool(value)
         if self._hwnd:
-            user32.EnableWindow(self._hwnd, self._enabled)
+            self._sync_enabled()
 
     @property
     def visible(self) -> bool:
@@ -157,8 +165,29 @@ class Control:
             return
         self._visible = value
         if self._hwnd:
-            user32.ShowWindow(self._hwnd, _api.SW_SHOW if value else _api.SW_HIDE)
+            self._sync_shown()
             self._window.relayout()
+
+    def _sync_shown(self) -> None:
+        shown = self._visible and not self._suppressed
+        user32.ShowWindow(self.hwnd, _api.SW_SHOW if shown else _api.SW_HIDE)
+
+    def _sync_enabled(self) -> None:
+        user32.EnableWindow(self.hwnd, self._enabled)
+
+    def _inherit_suppression(self) -> None:
+        """A control created on a hidden tab page starts hidden."""
+        node = getattr(self, "_parent", None)
+        while node is not None:
+            if getattr(node, "_page_inactive", False):
+                self._suppress(+1)
+                return
+            node = getattr(node, "_parent", None)
+
+    def _suppress(self, delta: int) -> None:
+        self._suppressed = max(0, self._suppressed + delta)
+        if self._hwnd:
+            self._sync_shown()
 
     def focus(self) -> None:
         """Move the keyboard focus to this control."""
@@ -196,6 +225,13 @@ class Control:
 
     def _command(self, code: int) -> None:
         """A notification (WM_COMMAND) from the native control."""
+
+    def _scroll(self, code: int) -> None:
+        """A WM_HSCROLL/WM_VSCROLL notification (trackbars)."""
+
+    def _notify(self, code: int, lparam: int) -> int:
+        """A WM_NOTIFY notification (common controls). Returns the message result."""
+        return 0
 
     def _send(self, msg: int, w: int = 0, l: int = 0) -> int:
         return user32.SendMessageW(self.hwnd, msg, wparam(w), l)
