@@ -211,7 +211,9 @@ class ControlTests(unittest.TestCase):
             with VBox():
                 label = Label("x")
         win.show()
-        self.assertEqual(_user32.SendMessageW(label.hwnd, WM_GETFONT, 0, 0), font_for_dpi(win.dpi))
+        # GDI handles only have 32 significant bits; SendMessage returns them sign-extended
+        got = _user32.SendMessageW(label.hwnd, WM_GETFONT, 0, 0) & 0xFFFFFFFF
+        self.assertEqual(got, font_for_dpi(win.dpi) & 0xFFFFFFFF)
 
     def test_controls_are_laid_out(self):
         with Window("t", size=(400, 300)) as win:
