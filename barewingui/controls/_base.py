@@ -35,7 +35,8 @@ def find_window(node: Any) -> Any:
     while node is not None:
         if isinstance(node, Window):
             return node
-        node = getattr(node, "_parent", None)
+        # Menu containers know their window directly (they are no layout nodes).
+        node = getattr(node, "_window", None) or getattr(node, "_parent", None)
     return None
 
 
