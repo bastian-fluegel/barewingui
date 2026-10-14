@@ -1,6 +1,7 @@
 """Common controls (comctl32): progress bar, slider, spin box, status bar, pickers."""
 
 import ctypes
+from ctypes import wintypes
 import datetime as dt
 import unittest
 
@@ -326,6 +327,15 @@ class ViewControlTests(unittest.TestCase):
         self.assertTrue(t.top < g.top and g.bottom <= t.bottom)
         n = rect_of(name)
         self.assertTrue(g.left <= n.left and n.right <= g.right)
+        # z-order: the pages are above the tab control (else its body paints over them)
+        _user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
+        _user32.GetWindow.restype = wintypes.HWND
+        above, node = [], _user32.GetWindow(tabs.hwnd, 3)  # GW_HWNDPREV
+        while node:
+            above.append(node)
+            node = _user32.GetWindow(node, 3)
+        self.assertIn(general._page_hwnd, above)
+        self.assertIn(advanced._page_hwnd, above)
 
     def test_tab_control_rules(self):
         with Window("t"):

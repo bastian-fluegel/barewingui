@@ -79,9 +79,10 @@ class TabPage(Stack):
         super().__init__("vertical", padding=padding, gap=gap, **options)  # type: ignore[arg-type]
 
     def place(self, rect: Rect, scale: Scale) -> None:
+        # No SWP_NOZORDER: the page must stay on top of its tab control (hWndInsertAfter
+        # None is HWND_TOP), otherwise the tab control paints its body over the page.
         user32.SetWindowPos(
-            self._page_hwnd, None, rect.x, rect.y, rect.w, rect.h,
-            _api.SWP_NOZORDER | _api.SWP_NOACTIVATE,
+            self._page_hwnd, None, rect.x, rect.y, rect.w, rect.h, _api.SWP_NOACTIVATE,
         )
         super().place(Rect(0, 0, rect.w, rect.h), scale)  # children are relative to the page
 
