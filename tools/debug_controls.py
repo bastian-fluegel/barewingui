@@ -22,7 +22,7 @@ user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
 
 def describe(win):
     print(f"window dpi={win.dpi} size={win.size}")
-    items = [(c.hwnd, type(c).__name__) for c in win._controls.values()]
+    items = [(h, type(c).__name__) for h, c in win._controls.items()]
     for page in (getattr(c, "pages", ()) for c in win._controls.values()):
         items += [(p._page_hwnd, "TabPage:" + p.title) for p in page]
     for hwnd, name in items:
