@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 _Rewrite towards 0.2.0 on branch `rewrite/beta-core`._
 
 ### Added
+- Menus (`MenuBar`, `Menu`, `MenuItem`, `MenuSeparator`, `ContextMenu`), window-wide keyboard shortcuts (`shortcut=`, `Window.add_shortcut`), `Timer`, modal windows (`Window.show_modal`) and the standard dialogs (`message_box`, `ask_yes_no`, `open_file`, `save_file`, `pick_folder`, `choose_color`, `choose_font`, `input_box`).
 - Common controls: `ProgressBar`, `Slider`, `SpinBox`, `StatusBar`, `DatePicker`, `TimePicker`, `ListView`, `TreeView` (lazy loading via `on_expand`), `TabControl` with `TabPage` (native themed pages).
 - Standard controls: `Label`, `Button`, `CheckBox`, `RadioButton`, `TextBox` (`TextInput`), `ComboBox`, `ListBox`, `GroupBox`, with flex options, access keys, native system font per DPI and `on_*` events (`barewingui.events.Event`).
 

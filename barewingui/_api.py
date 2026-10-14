@@ -270,6 +270,44 @@ TCM_INSERTITEMW = 0x133E
 TCIF_TEXT = 0x0001
 TCN_SELCHANGE = -551
 
+# ---------------------------------------------------------------------------
+# Menus, accelerators, timers, dialogs
+# ---------------------------------------------------------------------------
+WM_TIMER = 0x0113
+WM_CONTEXTMENU = 0x007B
+IDCANCEL = 2
+
+MF_STRING = 0x0000
+MF_SEPARATOR = 0x0800
+MF_POPUP = 0x0010
+MF_BYCOMMAND = 0x0000
+MF_GRAYED = 0x0001
+MF_ENABLED = 0x0000
+MF_CHECKED = 0x0008
+MF_UNCHECKED = 0x0000
+TPM_RIGHTBUTTON = 0x0002
+
+FVIRTKEY, FSHIFT, FCONTROL, FALT = 0x01, 0x04, 0x08, 0x10
+GWLP_HWNDPARENT = -8
+
+MB_ICONERROR, MB_ICONQUESTION, MB_ICONWARNING, MB_ICONINFORMATION = 0x10, 0x20, 0x30, 0x40
+MB_BUTTONS = {
+    "ok": 0x0, "ok_cancel": 0x1, "abort_retry_ignore": 0x2, "yes_no_cancel": 0x3,
+    "yes_no": 0x4, "retry_cancel": 0x5,
+}
+MB_RESULTS = {1: "ok", 2: "cancel", 3: "abort", 4: "retry", 5: "ignore", 6: "yes", 7: "no"}
+
+OFN_OVERWRITEPROMPT = 0x00000002
+OFN_NOCHANGEDIR = 0x00000008
+OFN_ALLOWMULTISELECT = 0x00000200
+OFN_PATHMUSTEXIST = 0x00000800
+OFN_FILEMUSTEXIST = 0x00001000
+OFN_EXPLORER = 0x00080000
+CC_RGBINIT, CC_FULLOPEN = 0x0001, 0x0002
+CF_SCREENFONTS, CF_INITTOLOGFONTSTRUCT, CF_EFFECTS = 0x0001, 0x0040, 0x0100
+BIF_RETURNONLYFSDIRS, BIF_NEWDIALOGSTYLE = 0x0001, 0x0040
+COINIT_APARTMENTTHREADED = 0x2
+
 
 # ---------------------------------------------------------------------------
 # Structures
@@ -476,6 +514,86 @@ class TCITEMW(ctypes.Structure):
     ]
 
 
+class ACCEL(ctypes.Structure):
+    _fields_ = [("fVirt", wintypes.BYTE), ("key", wintypes.WORD), ("cmd", wintypes.WORD)]
+
+
+class OPENFILENAMEW(ctypes.Structure):
+    _fields_ = [
+        ("lStructSize", wintypes.DWORD),
+        ("hwndOwner", HWND),
+        ("hInstance", wintypes.HINSTANCE),
+        ("lpstrFilter", wintypes.LPCWSTR),
+        ("lpstrCustomFilter", wintypes.LPWSTR),
+        ("nMaxCustFilter", wintypes.DWORD),
+        ("nFilterIndex", wintypes.DWORD),
+        ("lpstrFile", wintypes.LPWSTR),
+        ("nMaxFile", wintypes.DWORD),
+        ("lpstrFileTitle", wintypes.LPWSTR),
+        ("nMaxFileTitle", wintypes.DWORD),
+        ("lpstrInitialDir", wintypes.LPCWSTR),
+        ("lpstrTitle", wintypes.LPCWSTR),
+        ("Flags", wintypes.DWORD),
+        ("nFileOffset", wintypes.WORD),
+        ("nFileExtension", wintypes.WORD),
+        ("lpstrDefExt", wintypes.LPCWSTR),
+        ("lCustData", LPARAM),
+        ("lpfnHook", ctypes.c_void_p),
+        ("lpTemplateName", wintypes.LPCWSTR),
+        ("pvReserved", ctypes.c_void_p),
+        ("dwReserved", wintypes.DWORD),
+        ("FlagsEx", wintypes.DWORD),
+    ]
+
+
+class CHOOSECOLORW(ctypes.Structure):
+    _fields_ = [
+        ("lStructSize", wintypes.DWORD),
+        ("hwndOwner", HWND),
+        ("hInstance", wintypes.HWND),
+        ("rgbResult", wintypes.DWORD),
+        ("lpCustColors", ctypes.POINTER(wintypes.DWORD)),
+        ("Flags", wintypes.DWORD),
+        ("lCustData", LPARAM),
+        ("lpfnHook", ctypes.c_void_p),
+        ("lpTemplateName", wintypes.LPCWSTR),
+    ]
+
+
+class CHOOSEFONTW(ctypes.Structure):
+    _fields_ = [
+        ("lStructSize", wintypes.DWORD),
+        ("hwndOwner", HWND),
+        ("hDC", wintypes.HDC),
+        ("lpLogFont", ctypes.POINTER(LOGFONTW)),
+        ("iPointSize", ctypes.c_int),
+        ("Flags", wintypes.DWORD),
+        ("rgbColors", wintypes.DWORD),
+        ("lCustData", LPARAM),
+        ("lpfnHook", ctypes.c_void_p),
+        ("lpTemplateName", wintypes.LPCWSTR),
+        ("hInstance", wintypes.HINSTANCE),
+        ("lpszStyle", wintypes.LPWSTR),
+        ("nFontType", wintypes.WORD),
+        ("missingAlignment", wintypes.WORD),
+        ("nSizeMin", ctypes.c_int),
+        ("nSizeMax", ctypes.c_int),
+    ]
+
+
+class BROWSEINFOW(ctypes.Structure):
+    _fields_ = [
+        ("hwndOwner", HWND),
+        ("pidlRoot", ctypes.c_void_p),
+        ("pszDisplayName", wintypes.LPWSTR),
+        ("lpszTitle", wintypes.LPCWSTR),
+        ("ulFlags", wintypes.UINT),
+        ("lpfn", ctypes.c_void_p),
+        ("lParam", LPARAM),
+        ("iImage", ctypes.c_int),
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Lazy libraries with mandatory prototypes
 # ---------------------------------------------------------------------------
@@ -558,6 +676,25 @@ user32 = _Library(
             HWND, [wintypes.HINSTANCE, ctypes.c_void_p, HWND, DLGPROC, LPARAM],
         ),
         "SendMessageW": (LRESULT, [HWND, _UINT, WPARAM, LPARAM]),
+        "CreateMenu": (wintypes.HMENU, []),
+        "CreatePopupMenu": (wintypes.HMENU, []),
+        "DestroyMenu": (_BOOL, [wintypes.HMENU]),
+        "AppendMenuW": (_BOOL, [wintypes.HMENU, _UINT, ULONG_PTR, wintypes.LPCWSTR]),
+        "ModifyMenuW": (_BOOL, [wintypes.HMENU, _UINT, _UINT, ULONG_PTR, wintypes.LPCWSTR]),
+        "CheckMenuItem": (_DWORD, [wintypes.HMENU, _UINT, _UINT]),
+        "EnableMenuItem": (_BOOL, [wintypes.HMENU, _UINT, _UINT]),
+        "SetMenu": (_BOOL, [HWND, wintypes.HMENU]),
+        "DrawMenuBar": (_BOOL, [HWND]),
+        "TrackPopupMenu": (_BOOL, [wintypes.HMENU, _UINT, _INT, _INT, _INT, HWND, ctypes.c_void_p]),
+        "GetCursorPos": (_BOOL, [_P(wintypes.POINT)]),
+        "SetForegroundWindow": (_BOOL, [HWND]),
+        "CreateAcceleratorTableW": (wintypes.HANDLE, [_P(ACCEL), _INT]),
+        "DestroyAcceleratorTable": (_BOOL, [wintypes.HANDLE]),
+        "TranslateAcceleratorW": (_INT, [HWND, wintypes.HANDLE, _P(wintypes.MSG)]),
+        "SetTimer": (ULONG_PTR, [HWND, ULONG_PTR, _UINT, ctypes.c_void_p]),
+        "KillTimer": (_BOOL, [HWND, ULONG_PTR]),
+        "MessageBoxW": (_INT, [HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, _UINT]),
+        "SetWindowLongPtrW": (LONG_PTR, [HWND, _INT, LONG_PTR]),
         "GetWindowTextLengthW": (_INT, [HWND]),
         "GetWindowTextW": (_INT, [HWND, wintypes.LPWSTR, _INT]),
         "EnableWindow": (_BOOL, [HWND, _BOOL]),
@@ -569,6 +706,7 @@ user32 = _Library(
             _BOOL, [_UINT, _UINT, ctypes.c_void_p, _UINT, _UINT],
         ),
     },
+    aliases={"SetWindowLongPtrW": "SetWindowLongW"},  # 32-bit Windows has no *Ptr export
 )
 
 kernel32 = _Library(
@@ -589,6 +727,33 @@ gdi32 = _Library(
         "DeleteObject": (_BOOL, [wintypes.HGDIOBJ]),
         "SelectObject": (wintypes.HGDIOBJ, [wintypes.HDC, wintypes.HGDIOBJ]),
         "GetTextExtentPoint32W": (_BOOL, [wintypes.HDC, wintypes.LPCWSTR, _INT, _P(wintypes.SIZE)]),
+    },
+)
+
+comdlg32 = _Library(
+    "comdlg32",
+    {
+        "GetOpenFileNameW": (_BOOL, [_P(OPENFILENAMEW)]),
+        "GetSaveFileNameW": (_BOOL, [_P(OPENFILENAMEW)]),
+        "ChooseColorW": (_BOOL, [_P(CHOOSECOLORW)]),
+        "ChooseFontW": (_BOOL, [_P(CHOOSEFONTW)]),
+        "CommDlgExtendedError": (_DWORD, []),
+    },
+)
+
+shell32 = _Library(
+    "shell32",
+    {
+        "SHBrowseForFolderW": (ctypes.c_void_p, [_P(BROWSEINFOW)]),
+        "SHGetPathFromIDListW": (_BOOL, [ctypes.c_void_p, wintypes.LPWSTR]),
+    },
+)
+
+ole32 = _Library(
+    "ole32",
+    {
+        "CoInitializeEx": (ctypes.c_long, [ctypes.c_void_p, _DWORD]),
+        "CoTaskMemFree": (None, [ctypes.c_void_p]),
     },
 )
 

@@ -86,6 +86,13 @@ class Window(Container):
         self.default_button: Any = None
         self._last_control: Any = None
         self._status: Any = None
+        self._menubar: Any = None
+        self._commands: dict[int, Callable[[], object]] = {}
+        self._next_command = 1000
+        self._accels: list[tuple[Any, int]] = []
+        self._haccel: Any = None
+        self.context_menu: Any = None
+        self.cancel_button: Any = None
         self._shown = False
         self._style = _api.WS_OVERLAPPEDWINDOW | _api.WS_CLIPCHILDREN
         if not resizable:
@@ -159,6 +166,73 @@ class Window(Container):
         """The window's :class:`StatusBar`, or ``None``."""
         return self._status
 
+    # -- menus, shortcuts, commands --------------------------------------------
+    def _register_command(self, handler: Callable[[], object]) -> int:
+        """A command id for a menu item or shortcut (delivered as WM_COMMAND)."""
+        ident = self._next_command
+        self._next_command += 1
+        self._commands[ident] = handler
+        return ident
+
+    def _attach_menubar(self, bar: Any) -> None:
+        if self._menubar is not None:
+            raise LayoutError("a Window has only one MenuBar")
+        size = self.size  # the client size the program asked for
+        self._menubar = bar
+        if not user32.SetMenu(self.hwnd, bar._hmenu):
+            raise _api.last_error("SetMenu")
+        self._set_client_size(size)  # the bar takes room: grow the window to keep the client size
+
+    def _add_accelerator(self, shortcut: Any, ident: int) -> None:
+        self._accels.append((shortcut, ident))
+        self._rebuild_accelerators()
+
+    def _rebuild_accelerators(self) -> None:
+        if self._haccel:
+            user32.DestroyAcceleratorTable(self._haccel)
+            self._haccel = None
+        if not self._accels:
+            return
+        table = (_api.ACCEL * len(self._accels))()
+        for slot, (shortcut, ident) in zip(table, self._accels):
+            slot.fVirt = (
+                _api.FVIRTKEY
+                | (_api.FCONTROL if shortcut.ctrl else 0)
+                | (_api.FSHIFT if shortcut.shift else 0)
+                | (_api.FALT if shortcut.alt else 0)
+            )
+            slot.key = shortcut.vk
+            slot.cmd = ident
+        handle = user32.CreateAcceleratorTableW(table, len(table))
+        if not handle:
+            raise _api.last_error("CreateAcceleratorTableW")
+        self._haccel = handle
+
+    def add_shortcut(self, keys: str, handler: Callable[[], object]) -> None:
+        """Run ``handler`` when ``keys`` (e.g. ``"Ctrl+K"``, ``"F5"``) is pressed in this window."""
+        from barewingui.shortcuts import parse_shortcut
+
+        self._add_accelerator(parse_shortcut(keys), self._register_command(handler))
+
+    def show_modal(self, parent: "Window | None" = None) -> None:
+        """
+        Show the window and wait until it is closed. ``parent`` is blocked meanwhile
+        and becomes the owner (the dialog stays on top of it).
+        """
+        app = self._app
+        app._check_thread()
+        owner = parent.hwnd if parent is not None and parent.alive else None
+        if owner:
+            user32.SetWindowLongPtrW(self.hwnd, _api.GWLP_HWNDPARENT, owner)
+            user32.EnableWindow(owner, False)
+        try:
+            self.show()
+            app._pump(until=lambda: not self.alive)
+        finally:
+            if owner and parent is not None and parent.alive:
+                user32.EnableWindow(owner, True)
+                user32.SetForegroundWindow(owner)
+
     def relayout(self) -> None:
         """Place the root container to fill the client area."""
         if self._hwnd is None or self._root is None:
@@ -231,7 +305,7 @@ class Window(Container):
         """Outer window size in pixels that yields the given client size at the current DPI."""
         rc = wintypes.RECT(0, 0, client_w, client_h)
         if not user32.AdjustWindowRectExForDpi(
-            ctypes.byref(rc), self._style, False, self._ex_style, self._dpi
+            ctypes.byref(rc), self._style, self._menubar is not None, self._ex_style, self._dpi
         ):
             raise _api.last_error("AdjustWindowRectExForDpi")
         return rc.right - rc.left, rc.bottom - rc.top
@@ -272,8 +346,32 @@ class Window(Container):
                 if control is not None:
                     control._command((wparam >> 16) & 0xFFFF)
                     return True, 0
-            elif (wparam & 0xFFFF) == _api.IDOK and self.default_button is not None:
-                self.default_button.click()  # Enter pressed inside a text box
+            else:
+                ident = wparam & 0xFFFF
+                handler = self._commands.get(ident)
+                if handler is not None:  # menu item or shortcut
+                    handler()
+                    return True, 0
+                if ident == _api.IDOK and self.default_button is not None:
+                    self.default_button.click()  # Enter pressed inside a text box
+                    return True, 0
+                if ident == _api.IDCANCEL and self.cancel_button is not None:
+                    self.cancel_button.click()  # Esc
+                    return True, 0
+            return False, 0
+
+        if msg == _api.WM_CONTEXTMENU:
+            control = self._controls.get(wparam & _PTR_MASK)
+            menu = getattr(control, "context_menu", None) or self.context_menu
+            if menu is not None:
+                x, y = lparam & 0xFFFF, (lparam >> 16) & 0xFFFF
+                if lparam & 0xFFFFFFFF == 0xFFFFFFFF:  # opened with the keyboard: use the control's corner
+                    rc = wintypes.RECT()
+                    user32.GetWindowRect(wparam & _PTR_MASK or self.hwnd, ctypes.byref(rc))
+                    x, y = rc.left + 8, rc.top + 8
+                else:
+                    x, y = x - 0x10000 if x & 0x8000 else x, y - 0x10000 if y & 0x8000 else y
+                menu.popup(x, y)
                 return True, 0
             return False, 0
 
@@ -316,6 +414,9 @@ class Window(Container):
         if msg == _api.WM_NCDESTROY:
             hwnd, self._hwnd = self._hwnd, None
             self._controls.clear()
+            if self._haccel:
+                user32.DestroyAcceleratorTable(self._haccel)
+                self._haccel = None
             self.default_button = None
             app = self._app
             if hwnd is not None:

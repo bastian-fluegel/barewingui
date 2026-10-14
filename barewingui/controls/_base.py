@@ -79,6 +79,7 @@ class Control:
     """
 
     _in_layout = True
+    context_menu: Any = None  # a ContextMenu shown on right click (see ContextMenu)
 
     def __init__(self, *, enabled: bool = True, visible: bool = True, **flex: object) -> None:
         self._window = owning_window()

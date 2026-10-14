@@ -122,6 +122,14 @@ def _init_process() -> None:
 
 def _message_window_proc(hwnd: int, msg: int, wparam: int, lparam: int) -> int:
     app = App._instance
+    if app is not None and msg == _api.WM_TIMER:
+        timer = app._timers.get(wparam)
+        if timer is not None:
+            try:
+                timer._fire()
+            except BaseException as exc:  # noqa: BLE001 - must not escape into native code
+                app.errors.capture(exc)
+        return 0
     if app is not None and msg == _WM_INVOKE:
         try:
             app._invoke.drain()
@@ -162,12 +170,15 @@ class App:
             self._running = False
             self._exit_code = 0
             self._next_key = 1
+            self._timers: dict[int, Any] = {}
+            self._next_timer = 0
             self._pending: dict[int, Window] = {}
             self._windows: dict[int, Window] = {}
             self.errors = ErrorPolicy(stop=self._stop_loop)
             self._invoke = InvokeQueue(wake=self._wake, on_error=self.errors.capture)
             self._msg_hwnd: int | None = None
             _init_process()
+            _api.ole32.CoInitializeEx(None, _api.COINIT_APARTMENTTHREADED)  # shell dialogs need an STA
             self._create_message_window()
         except BaseException:
             App._instance = None
@@ -282,18 +293,31 @@ class App:
             raise _api.last_error("CreateWindowExW (message window)")
         self._msg_hwnd = hwnd
 
-    def _pump(self) -> None:
+    def _pump(self, until: Callable[[], bool] | None = None) -> None:
+        """
+        The message loop. With ``until`` (modal dialogs) it returns as soon as
+        ``until()`` is true; a WM_QUIT seen then is passed on to the outer loop.
+        """
         msg = wintypes.MSG()
         p_msg = ctypes.byref(msg)
         while True:
+            if until is not None and until():
+                return
             result = user32.GetMessageW(p_msg, None, 0, 0)
             if result == 0:  # WM_QUIT
-                self._exit_code = int(msg.wParam)
+                if until is not None:
+                    user32.PostQuitMessage(int(msg.wParam))
+                else:
+                    self._exit_code = int(msg.wParam)
                 return
             if result == -1:
                 raise _api.last_error("GetMessageW")
             root = user32.GetAncestor(msg.hWnd, _api.GA_ROOT) if msg.hWnd else None
-            if root and root in self._windows and user32.IsDialogMessageW(root, p_msg):
-                continue
+            window = self._windows.get(root) if root else None
+            if window is not None:
+                if window._haccel and user32.TranslateAcceleratorW(root, window._haccel, p_msg):
+                    continue
+                if user32.IsDialogMessageW(root, p_msg):
+                    continue
             user32.TranslateMessage(p_msg)
             user32.DispatchMessageW(p_msg)
