@@ -50,6 +50,17 @@ def owning_window() -> Any:
     return window
 
 
+def parent_hwnd() -> int:
+    """HWND that new controls get as parent: the enclosing tab page, else the window."""
+    node = current_container()
+    while node is not None:
+        page = getattr(node, "_page_hwnd", None)
+        if page:
+            return page
+        node = getattr(node, "_parent", None)
+    return owning_window().hwnd
+
+
 def normalize_newlines(text: str) -> str:
     return text.replace("\r\n", "\n")
 
@@ -71,7 +82,7 @@ class Control:
 
     def __init__(self, *, enabled: bool = True, visible: bool = True, **flex: object) -> None:
         self._window = owning_window()
-        self._suppressed = 0  # >0 while the control sits on a hidden tab page
+        self._parent_hwnd = parent_hwnd()
         self._hwnd: int | None = None
         self._font_dpi = 0
         self._visible = bool(visible)
@@ -89,11 +100,11 @@ class Control:
     ) -> None:
         window = self._window
         style |= _api.WS_CHILD | _api.WS_CLIPSIBLINGS
-        if self._visible and not self._suppressed:
+        if self._visible:
             style |= _api.WS_VISIBLE
         hwnd = user32.CreateWindowExW(
             ex_style, win_class, text, style, 0, 0, 0, 0,
-            window.hwnd, None, kernel32.GetModuleHandleW(None), None,
+            self._parent_hwnd, None, kernel32.GetModuleHandleW(None), None,
         )
         if not hwnd:
             raise _api.last_error(f"CreateWindowExW ({win_class})")
@@ -105,7 +116,6 @@ class Control:
         if self._in_layout:
             adopt(self)
             window._last_control = self
-            self._inherit_suppression()
         self._after_create()
         if window._shown:
             window.relayout()
@@ -169,25 +179,10 @@ class Control:
             self._window.relayout()
 
     def _sync_shown(self) -> None:
-        shown = self._visible and not self._suppressed
-        user32.ShowWindow(self.hwnd, _api.SW_SHOW if shown else _api.SW_HIDE)
+        user32.ShowWindow(self.hwnd, _api.SW_SHOW if self._visible else _api.SW_HIDE)
 
     def _sync_enabled(self) -> None:
         user32.EnableWindow(self.hwnd, self._enabled)
-
-    def _inherit_suppression(self) -> None:
-        """A control created on a hidden tab page starts hidden."""
-        node = getattr(self, "_parent", None)
-        while node is not None:
-            if getattr(node, "_page_inactive", False):
-                self._suppress(+1)
-                return
-            node = getattr(node, "_parent", None)
-
-    def _suppress(self, delta: int) -> None:
-        self._suppressed = max(0, self._suppressed + delta)
-        if self._hwnd:
-            self._sync_shown()
 
     def focus(self) -> None:
         """Move the keyboard focus to this control."""

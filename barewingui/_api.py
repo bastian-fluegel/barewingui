@@ -150,6 +150,11 @@ LBN_DBLCLK = 2
 
 SPI_GETNONCLIENTMETRICS = 0x0029
 
+# dialog-style child windows (tab pages)
+DS_CONTROL = 0x0400
+ETDT_ENABLETAB = 0x0006
+DLGPROC = _FUNCTYPE(ctypes.c_ssize_t, HWND, wintypes.UINT, WPARAM, LPARAM)
+
 # ---------------------------------------------------------------------------
 # Common controls (comctl32)
 # ---------------------------------------------------------------------------
@@ -549,6 +554,9 @@ user32 = _Library(
         "PostMessageW": (_BOOL, [HWND, _UINT, WPARAM, LPARAM]),
         "PostQuitMessage": (None, [_INT]),
         "GetAncestor": (HWND, [HWND, _UINT]),
+        "CreateDialogIndirectParamW": (
+            HWND, [wintypes.HINSTANCE, ctypes.c_void_p, HWND, DLGPROC, LPARAM],
+        ),
         "SendMessageW": (LRESULT, [HWND, _UINT, WPARAM, LPARAM]),
         "GetWindowTextLengthW": (_INT, [HWND]),
         "GetWindowTextW": (_INT, [HWND, wintypes.LPWSTR, _INT]),
@@ -582,6 +590,11 @@ gdi32 = _Library(
         "SelectObject": (wintypes.HGDIOBJ, [wintypes.HDC, wintypes.HGDIOBJ]),
         "GetTextExtentPoint32W": (_BOOL, [wintypes.HDC, wintypes.LPCWSTR, _INT, _P(wintypes.SIZE)]),
     },
+)
+
+uxtheme = _Library(
+    "uxtheme",
+    {"EnableThemeDialogTexture": (ctypes.c_long, [HWND, _DWORD])},
 )
 
 # comctl32 must only be touched after the activation context is active,

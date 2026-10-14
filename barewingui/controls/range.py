@@ -198,7 +198,7 @@ class SpinBox(Control):
             0, "msctls_updown32", "",
             _api.WS_CHILD | _api.WS_VISIBLE | _api.WS_CLIPSIBLINGS | _api.UDS_SETBUDDYINT
             | _api.UDS_ALIGNRIGHT | _api.UDS_ARROWKEYS | _api.UDS_NOTHOUSANDS,
-            0, 0, 0, 0, self._window.hwnd, None, kernel32.GetModuleHandleW(None), None,
+            0, 0, 0, 0, self._parent_hwnd, None, kernel32.GetModuleHandleW(None), None,
         )
         if not hwnd:
             raise _api.last_error("CreateWindowExW (up-down)")
@@ -206,7 +206,7 @@ class SpinBox(Control):
         self._updown_send(_api.UDM_SETRANGE32, self._min, self._max)
         self._updown_send(_api.UDM_SETBUDDY, self.hwnd, 0)
         self.value = self._value_on_create
-        if not self._visible or self._suppressed:
+        if not self._visible:
             user32.ShowWindow(hwnd, _api.SW_HIDE)
         if not self._enabled:
             user32.EnableWindow(hwnd, False)
@@ -253,8 +253,7 @@ class SpinBox(Control):
     def _sync_shown(self) -> None:
         super()._sync_shown()
         if self._updown:
-            shown = self._visible and not self._suppressed
-            user32.ShowWindow(self._updown, _api.SW_SHOW if shown else _api.SW_HIDE)
+            user32.ShowWindow(self._updown, _api.SW_SHOW if self._visible else _api.SW_HIDE)
 
     def _sync_enabled(self) -> None:
         super()._sync_enabled()

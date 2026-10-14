@@ -6,7 +6,7 @@ from barewingui import _api
 from barewingui._api import kernel32, user32
 from barewingui._layout_core import Rect
 from barewingui._font import font_for_dpi, text_size
-from barewingui.controls._base import owning_window
+from barewingui.controls._base import owning_window, parent_hwnd
 from barewingui.dpi import Scale
 from barewingui.layout import Stack
 
@@ -29,7 +29,7 @@ class GroupBox(Stack):
         hwnd = user32.CreateWindowExW(
             0, "BUTTON", title,
             _api.WS_CHILD | _api.WS_VISIBLE | _api.WS_CLIPSIBLINGS | _api.BS_GROUPBOX,
-            0, 0, 0, 0, window.hwnd, None, kernel32.GetModuleHandleW(None), None,
+            0, 0, 0, 0, parent_hwnd(), None, kernel32.GetModuleHandleW(None), None,
         )
         if not hwnd:
             raise _api.last_error("CreateWindowExW (group box)")
@@ -80,9 +80,7 @@ class GroupBox(Stack):
     def _dpi_changed(self, dpi: int) -> None:
         self._apply_font(dpi)
 
-    # -- native frame events/visibility (tab pages) ----------------------------------
-    _suppressed = 0
-
+    # -- native frame events (none are needed) ------------------------------------
     def _command(self, code: int) -> None:
         pass
 
@@ -91,9 +89,3 @@ class GroupBox(Stack):
 
     def _notify(self, code: int, lparam: int) -> int:
         return 0
-
-    def _suppress(self, delta: int) -> None:
-        self._suppressed = max(0, self._suppressed + delta)
-        if self._hwnd:
-            shown = self.visible and not self._suppressed
-            user32.ShowWindow(self._hwnd, _api.SW_SHOW if shown else _api.SW_HIDE)

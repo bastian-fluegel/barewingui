@@ -6,14 +6,21 @@ import unittest
 
 from barewingui import (
     App,
+    Button,
+    CheckBox,
     DatePicker,
+    GroupBox,
     Label,
+    ListView,
     ProgressBar,
     Slider,
     SpinBox,
     StatusBar,
+    TabControl,
+    TabPage,
     TextBox,
     TimePicker,
+    TreeView,
     VBox,
     Window,
     _api,
@@ -149,6 +156,196 @@ class CommonControlTests(unittest.TestCase):
         self.assertEqual(picker.value, dt.time(13, 45, 10))
         picker.value = dt.time(6, 5, 4)
         self.assertEqual(picker.value, dt.time(6, 5, 4))
+
+
+@unittest.skipUnless(WINDOWS, "needs Windows")
+class ViewControlTests(unittest.TestCase):
+    def setUp(self):
+        self.app = App()
+
+    def tearDown(self):
+        if App._instance is not None:
+            App._instance.shutdown()
+
+    # -- ListView ------------------------------------------------------------
+    def test_list_view_rows_and_selection(self):
+        calls = []
+        with Window("t", size=(400, 300)) as win:
+            with VBox():
+                table = ListView(
+                    ["Name", ("Size", 80)],
+                    rows=[("a.txt", 10), ("b.txt",)],
+                    on_select=lambda: calls.append(table.selected_index),
+                    grow=1,
+                )
+        win.show()
+        self.assertEqual(table.columns, ("Name", "Size"))
+        self.assertEqual(table.rows, (("a.txt", "10"), ("b.txt", "")))
+        self.assertEqual(table.add_row(["c.txt", "30"]), 2)
+        table.set_cell(1, 1, 20)
+        self.assertEqual(table.rows[1], ("b.txt", "20"))
+        self.assertEqual(len(table), 3)
+        table.selected_index = 2
+        self.assertEqual((table.selected_index, table.selected_row), (2, ("c.txt", "30")))
+        self.assertEqual(calls, [])  # by program: silent
+        table.remove_row(0)
+        self.assertEqual(table.rows[0][0], "b.txt")
+        table.clear()
+        self.assertEqual((len(table), table.selected_index), (0, None))
+        with self.assertRaises(ValueError):
+            table.add_row(["too", "many", "cells"])
+        with self.assertRaises(IndexError):
+            table.remove_row(5)
+
+    def test_list_view_events_come_from_notifications(self):
+        calls = []
+        with Window("t") as win:
+            with VBox():
+                table = ListView(
+                    ["A", "B"], rows=[("1", "2"), ("3", "4")],
+                    on_select=lambda: calls.append("select"),
+                    on_activate=lambda: calls.append("activate"),
+                    on_column_click=lambda: calls.append(("column", table.clicked_column)),
+                )
+        item = _api.NMLISTVIEW()
+        item.hdr.hwndFrom = table.hwnd
+        item.hdr.code = _api.LVN_ITEMCHANGED
+        item.uChanged, item.uOldState, item.uNewState = _api.LVIF_STATE, 0, _api.LVIS_SELECTED
+        _user32.SendMessageW(win.hwnd, _api.WM_NOTIFY, 0, ctypes.addressof(item))
+        item.hdr.code = _api.LVN_ITEMACTIVATE
+        _user32.SendMessageW(win.hwnd, _api.WM_NOTIFY, 0, ctypes.addressof(item))
+        item.hdr.code, item.iSubItem = _api.LVN_COLUMNCLICK, 1
+        _user32.SendMessageW(win.hwnd, _api.WM_NOTIFY, 0, ctypes.addressof(item))
+        self.assertEqual(calls, ["select", "activate", ("column", 1)])
+
+    def test_list_view_multi_selection(self):
+        with Window("t"):
+            with VBox():
+                table = ListView(["A"], rows=[(str(i),) for i in range(5)], multi=True)
+                single = ListView(["A"], rows=[("x",), ("y",)])
+        table.selected_indices = [1, 3]
+        self.assertEqual(table.selected_indices, (1, 3))
+        with self.assertRaises(ValueError):
+            single.selected_indices = [0, 1]
+        with self.assertRaises(ValueError):
+            ListView([])
+
+    # -- TreeView ------------------------------------------------------------
+    def test_tree_view_nodes(self):
+        with Window("t", size=(400, 300)) as win:
+            with VBox():
+                tree = TreeView(grow=1)
+        win.show()
+        root = tree.add("root", data=1)
+        child = root.add("child", data=2)
+        child.add("grandchild")
+        self.assertEqual(tree.roots, (root,))
+        self.assertEqual(root.children, (child,))
+        self.assertIs(child.parent, root)
+        child.text = "renamed"
+        self.assertEqual(child.text, "renamed")
+        root.expand()
+        child.select()
+        self.assertIs(tree.selected, child)
+        child.remove()
+        self.assertEqual(root.children, ())
+        tree.clear()
+        self.assertEqual(tree.roots, ())
+        self.assertIsNone(tree.selected)
+
+    def test_tree_view_lazy_loading(self):
+        loaded = []
+
+        def load():
+            node = tree.event_node
+            loaded.append(node.text)
+            if not node.children:
+                node.add("loaded child")
+
+        with Window("t", size=(400, 300)) as win:
+            with VBox():
+                tree = TreeView(on_expand=load, grow=1)
+        win.show()
+        folder = tree.add("folder", has_children=True)
+        folder.expand()
+        self.assertEqual(loaded, ["folder"])
+        self.assertEqual([c.text for c in folder.children], ["loaded child"])
+
+    def test_tree_view_select_event(self):
+        seen = []
+        with Window("t", size=(400, 300)) as win:
+            with VBox():
+                tree = TreeView(on_select=lambda: seen.append(tree.event_node.text), grow=1)
+        win.show()
+        a = tree.add("a")
+        b = tree.add("b")
+        a.select()
+        self.assertEqual(seen, [])  # by program: silent
+        info = _api.NMTREEVIEWW()
+        info.hdr.hwndFrom = tree.hwnd
+        info.hdr.code = _api.TVN_SELCHANGEDW
+        info.itemNew.hItem = b._handle
+        _user32.SendMessageW(win.hwnd, _api.WM_NOTIFY, 0, ctypes.addressof(info))
+        self.assertEqual(seen, ["b"])
+
+    # -- Tabs ----------------------------------------------------------------
+    def test_tab_control_pages(self):
+        changed = []
+        with Window("t", size=(500, 400)) as win:
+            with VBox(padding=8):
+                with TabControl(grow=1, on_change=lambda: changed.append(tabs.selected_index)) as tabs:
+                    with TabPage("General") as general:
+                        name = TextBox("x")
+                        with GroupBox("Options"):
+                            CheckBox("Remember")
+                    with TabPage("Advanced") as advanced:
+                        Label("expert mode")
+                        Button("Reset")
+                Button("OK")
+        win.show()
+        self.assertEqual([p.title for p in tabs.pages], ["General", "Advanced"])
+        self.assertEqual(tabs.selected_index, 0)
+        self.assertTrue(_user32.IsWindowVisible(general._page_hwnd))
+        self.assertFalse(_user32.IsWindowVisible(advanced._page_hwnd))
+        self.assertTrue(_user32.IsWindowVisible(name.hwnd))
+        tabs.selected_index = 1
+        self.assertEqual(tabs.selected_page, advanced)
+        self.assertFalse(_user32.IsWindowVisible(general._page_hwnd))
+        self.assertTrue(_user32.IsWindowVisible(advanced._page_hwnd))
+        self.assertFalse(_user32.IsWindowVisible(name.hwnd))
+        self.assertEqual(changed, [])  # by program: no event
+        header = _api.NMHDR()
+        header.hwndFrom = tabs.hwnd
+        header.code = _api.TCN_SELCHANGE
+        tabs.selected_index = 0
+        _user32.SendMessageW(win.hwnd, _api.WM_NOTIFY, 0, ctypes.addressof(header))
+        self.assertEqual(changed, [0])
+        # the page content sits inside the tab control
+        t, g = rect_of(tabs), rect_of(general._page_hwnd)
+        self.assertTrue(t.left <= g.left and g.right <= t.right)
+        self.assertTrue(t.top < g.top and g.bottom <= t.bottom)
+        n = rect_of(name)
+        self.assertTrue(g.left <= n.left and n.right <= g.right)
+
+    def test_tab_control_rules(self):
+        with Window("t"):
+            with VBox():
+                with self.assertRaises(Exception):
+                    TabPage("outside")
+                with TabControl() as tabs:
+                    with self.assertRaises(Exception):
+                        Label("only pages are allowed here")
+        self.assertEqual(tabs.pages, ())
+
+    def test_tab_control_sets_the_minimum_window_size(self):
+        with Window("t", size=(100, 100)) as win:
+            with VBox():
+                with TabControl():
+                    with TabPage("One"):
+                        Button("A wide button", min_width=250)
+        win.show()
+        need = win._root.min_size(win.scale)
+        self.assertGreaterEqual(need.w, win.scale.px(250))
 
 
 if __name__ == "__main__":

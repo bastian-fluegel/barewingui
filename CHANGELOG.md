@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 _Rewrite towards 0.2.0 on branch `rewrite/beta-core`._
 
 ### Added
+- Common controls: `ProgressBar`, `Slider`, `SpinBox`, `StatusBar`, `DatePicker`, `TimePicker`, `ListView`, `TreeView` (lazy loading via `on_expand`), `TabControl` with `TabPage` (native themed pages).
 - Standard controls: `Label`, `Button`, `CheckBox`, `RadioButton`, `TextBox` (`TextInput`), `ComboBox`, `ListBox`, `GroupBox`, with flex options, access keys, native system font per DPI and `on_*` events (`barewingui.events.Event`).
 
 - `App`: one per run, message loop, `invoke`/`call` for other threads; errors in callbacks
