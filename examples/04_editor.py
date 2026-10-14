@@ -25,7 +25,7 @@ def build(path: str | None = None) -> Window:
                 quit_item = MenuItem("&Quit", shortcut="Ctrl+Q")
             with Menu("&Edit"):
                 select_all_item = MenuItem("Select &all", shortcut="Ctrl+A")
-        status = StatusBar(parts=[None, 120])
+        status = StatusBar(parts=[500, None])
         with VBox():
             editor = TextBox(multiline=True, grow=1)
 
