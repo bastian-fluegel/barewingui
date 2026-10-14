@@ -66,9 +66,10 @@ class GroupBox(Stack):
     def place(self, rect: Rect, scale: Scale) -> None:
         if self._hwnd:
             self._apply_font(scale.dpi)
+            # Always below its content: the frame fills its interior and would hide
+            # the controls inside if it were above them.
             user32.SetWindowPos(
-                self._hwnd, None, rect.x, rect.y, rect.w, rect.h,
-                _api.SWP_NOZORDER | _api.SWP_NOACTIVATE,
+                self._hwnd, _api.HWND_BOTTOM, rect.x, rect.y, rect.w, rect.h, _api.SWP_NOACTIVATE,
             )
         super().place(rect, scale)
 

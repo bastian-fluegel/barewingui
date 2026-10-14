@@ -68,6 +68,11 @@ ERROR_CLASS_ALREADY_EXISTS = 1410
 
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4
 HWND_MESSAGE = -3
+HWND_BOTTOM = 1
+RDW_INVALIDATE = 0x0001
+RDW_ERASE = 0x0004
+RDW_ALLCHILDREN = 0x0080
+RDW_UPDATENOW = 0x0100
 
 # ---------------------------------------------------------------------------
 # Child controls
@@ -657,6 +662,7 @@ user32 = _Library(
         "DefWindowProcW": (LRESULT, [HWND, _UINT, WPARAM, LPARAM]),
         "ShowWindow": (_BOOL, [HWND, _INT]),
         "UpdateWindow": (_BOOL, [HWND]),
+        "RedrawWindow": (_BOOL, [HWND, ctypes.c_void_p, ctypes.c_void_p, _UINT]),
         "SetWindowTextW": (_BOOL, [HWND, wintypes.LPCWSTR]),
         "SetWindowPos": (_BOOL, [HWND, HWND, _INT, _INT, _INT, _INT, _UINT]),
         "GetClientRect": (_BOOL, [HWND, _P(wintypes.RECT)]),

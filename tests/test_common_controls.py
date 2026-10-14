@@ -297,8 +297,8 @@ class ViewControlTests(unittest.TestCase):
                 with TabControl(grow=1, on_change=lambda: changed.append(tabs.selected_index)) as tabs:
                     with TabPage("General") as general:
                         name = TextBox("x")
-                        with GroupBox("Options"):
-                            CheckBox("Remember")
+                        with GroupBox("Options") as group:
+                            remember = CheckBox("Remember")
                     with TabPage("Advanced") as advanced:
                         Label("expert mode")
                         Button("Reset")
@@ -336,6 +336,12 @@ class ViewControlTests(unittest.TestCase):
             node = _user32.GetWindow(node, 3)
         self.assertIn(general._page_hwnd, above)
         self.assertIn(advanced._page_hwnd, above)
+        # and inside the page the group frame is below the control it contains
+        node, over_group = _user32.GetWindow(group._hwnd, 3), []
+        while node:
+            over_group.append(node)
+            node = _user32.GetWindow(node, 3)
+        self.assertIn(remember.hwnd, over_group)
 
     def test_tab_control_rules(self):
         with Window("t"):

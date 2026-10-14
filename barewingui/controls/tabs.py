@@ -150,6 +150,11 @@ class TabControl(Control, Container):
         for i, page in enumerate(self._pages):
             shown = i == index and self._visible
             user32.ShowWindow(page._page_hwnd, _api.SW_SHOW if shown else _api.SW_HIDE)
+        # repaint everything behind and in the pages (no stale pixels of the old page)
+        user32.RedrawWindow(
+            self._parent_hwnd, None, None,
+            _api.RDW_INVALIDATE | _api.RDW_ERASE | _api.RDW_ALLCHILDREN | _api.RDW_UPDATENOW,
+        )
 
     def _sync_shown(self) -> None:
         super()._sync_shown()
