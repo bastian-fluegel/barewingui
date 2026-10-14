@@ -65,6 +65,7 @@ class ControlTests(unittest.TestCase):
             with VBox():
                 ok = Button("OK", on_click=lambda: calls.append("ctor"))
                 ok.on_click(lambda: calls.append("second"))
+        win.show()  # BM_CLICK is ignored while the window was never shown
         _user32.SendMessageW(ok.hwnd, BM_CLICK, 0, 0)
         self.assertEqual(calls, ["ctor", "second"])
         self.assertEqual(ok.text, "OK")
@@ -103,9 +104,10 @@ class ControlTests(unittest.TestCase):
     # -- check boxes and radio buttons ---------------------------------------
     def test_checkbox_state_and_event(self):
         calls = []
-        with Window("t"):
+        with Window("t") as win:
             with VBox():
                 box = CheckBox("Remember", checked=True, on_change=lambda: calls.append(1))
+        win.show()
         self.assertIs(box.checked, True)
         _user32.SendMessageW(box.hwnd, BM_CLICK, 0, 0)
         self.assertIs(box.checked, False)
@@ -122,13 +124,14 @@ class ControlTests(unittest.TestCase):
         self.assertIs(box.checked, True)
 
     def test_radio_groups(self):
-        with Window("t"):
+        with Window("t") as win:
             with VBox():
                 a = RadioButton("A", checked=True)
                 b = RadioButton("B")
                 Label("separator starts a new group")
                 c = RadioButton("C", checked=True)
                 d = RadioButton("D")
+        win.show()
         self.assertTrue(a.checked and not b.checked and c.checked and not d.checked)
         _user32.SendMessageW(b.hwnd, BM_CLICK, 0, 0)
         self.assertTrue(b.checked)
@@ -274,7 +277,7 @@ class ControlTests(unittest.TestCase):
     def test_min_window_size_follows_content(self):
         with Window("t", size=(100, 100)) as win:
             with VBox(padding=10):
-                Button("A fairly long button caption", width=300)
+                Button("A fairly long button caption", min_width=300)
         win.show()
         need = win._root.min_size(win.scale)
         self.assertGreaterEqual(need.w, win.scale.px(300) + 2 * win.scale.px(10))
