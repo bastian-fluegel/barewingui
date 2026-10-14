@@ -18,15 +18,15 @@ class Probe:
     def __init__(self, w, h, **flex):
         self.flex = Flex(**flex)
         self.visible = True
-        self._size = Size(w, h)
+        self._size = (w, h)  # DIPs, like every size in the library
         self.rect = None
         adopt(self)
 
     def natural_size(self, scale):
-        return self._size
+        return Size(scale.px(self._size[0]), scale.px(self._size[1]))
 
     def min_size(self, scale):
-        return self._size
+        return self.natural_size(scale)
 
     def place(self, rect, scale):
         self.rect = rect
