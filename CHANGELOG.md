@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Rewrite towards 0.2.0 on branch `rewrite/beta-core`._
+## [0.2.0b1] - 2026-10-16
+
+First beta of the rewrite. **Breaking:** the 0.1.x API (absolute `pos=`, `Window(width=, height=)`, the `theme` module) is gone; this release is a new library with the same name. Controls are native Win32 controls only; BareWinGUI draws nothing itself.
+
+Known limits: Windows only, no dark mode, no grid layout, no rich text. Real mouse/keyboard behaviour, native dialogs and multi-monitor DPI changes are not covered by the automated tests; please report what you find.
 
 ### Added
 - Publishing workflow (`publish.yml`, PyPI trusted publishing, TestPyPI via manual run); the logic CI job now builds and installs the wheel.
@@ -163,7 +167,8 @@ _Rewrite towards 0.2.0 on branch `rewrite/beta-core`._
 
 - Project scaffold: MIT license, README, `pyproject.toml`, and `.gitignore`.
 
-[unreleased]: https://github.com/bastian-fluegel/barewingui/compare/9830ab5...HEAD
+[unreleased]: https://github.com/bastian-fluegel/barewingui/compare/v0.2.0b1...HEAD
+[0.2.0b1]: https://github.com/bastian-fluegel/barewingui/compare/9830ab5...v0.2.0b1
 [0.1.11]: https://github.com/bastian-fluegel/barewingui/compare/47388e4...9830ab5
 [0.1.10]: https://github.com/bastian-fluegel/barewingui/compare/23f2f82...47388e4
 [0.1.9]: https://github.com/bastian-fluegel/barewingui/compare/5cc3485...23f2f82

@@ -1,3 +1,5 @@
+> **Outdated:** this document describes BareWinGUI 0.1.x and no longer matches the code (0.2.0 beta). See the README and the `examples/` folder for the current API.
+
 # BareWinGUI – Technische Spezifikation & Rahmenbedingungen
 
 ## 1. Projektidentität & Philosophie

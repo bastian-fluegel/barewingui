@@ -1,0 +1,36 @@
+name: Bug report
+description: Something looks wrong or does not work (Windows)
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead? A screenshot helps a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Minimal code
+      description: The smallest script that shows the problem.
+      render: python
+  - type: input
+    id: version
+    attributes:
+      label: BareWinGUI version
+      placeholder: "0.2.0b1"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and display scaling
+      placeholder: "Windows 11 23H2, 150 %"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version (and 32/64 bit)
+      placeholder: "3.12, 64 bit"

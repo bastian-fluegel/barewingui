@@ -1,10 +1,9 @@
 """
 barewingui
 ~~~~~~~~~~
-Native Win32 GUIs for Python without dependencies.
+Native Windows GUIs for Python: real Win32 controls, flexbox-style layout, no dependencies.
 
-Work in progress on the way to 0.2.0 (beta): the core, the layout engine and
-windows and the standard controls are in place; common controls and dialogs are being ported (see docs/ZIELBILD.md).
+Beta (0.2.0b1). Importable everywhere; creating an App needs Windows.
 """
 
 from __future__ import annotations
@@ -55,7 +54,7 @@ from barewingui.layout import Flex, HBox, Rect, Size, Spacer, Stack, VBox
 from barewingui.timer import Timer
 from barewingui.window import Window
 
-__version__ = "0.2.0.dev0"
+__version__ = "0.2.0b1"
 
 __all__ = [
     "App",

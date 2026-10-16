@@ -93,6 +93,10 @@ python -m unittest discover -s tests
 
 Logic tests (layout, scaling, shortcuts, dispatch) run everywhere; tests that create real windows run on Windows only and are skipped elsewhere. GitHub Actions runs both.
 
+### Feedback
+
+This is a beta. Please try it and tell me what is missing or broken: [report a bug or give feedback](https://github.com/bastian-fluegel/barewingui/issues/new/choose). Useful details: Windows version, display scaling, Python version, and a small script.
+
 ### License
 
 Distributed under the MIT License. See [LICENSE.md](LICENSE.md) for details.
@@ -152,6 +156,10 @@ Start mit `python examples/<Datei>.py`: Formular mit Prüfung (`01_form.py`), Da
 ```bash
 python -m unittest discover -s tests
 ```
+
+### Rückmeldung
+
+Das ist eine Beta. Probier es aus und sag mir, was fehlt oder kaputt ist: [Fehler melden oder Rückmeldung geben](https://github.com/bastian-fluegel/barewingui/issues/new/choose). Hilfreich: Windows-Version, Skalierung, Python-Version und ein kleines Skript.
 
 ### Lizenz
 

@@ -1,0 +1,21 @@
+name: Feedback / missing feature
+description: Tell me what you tried and what was missing or confusing
+labels: [feedback]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What did you want to build?
+    validations:
+      required: true
+  - type: textarea
+    id: missing
+    attributes:
+      label: What was missing, confusing or annoying?
+    validations:
+      required: true
+  - type: dropdown
+    id: background
+    attributes:
+      label: Where do you come from? (optional)
+      options: [AutoIt, tkinter, PowerShell / Windows Forms, PyQt / wxPython, Other, New to GUIs]
