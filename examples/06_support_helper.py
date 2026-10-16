@@ -153,7 +153,7 @@ def format_report(facts, checks, drives) -> str:
         lines += [f"  {d:<6}{size:>10} total{free:>10} free{used:>7} used" for d, size, free, used in drives]
     if checks:
         lines += ["", "Network"]
-        lines += [f"  {title:<24}{target:<14}{result:<8}{took}" for title, target, result, took in checks]
+        lines += [f"  {title:<24}{target:<14}{result:<14}{took}" for title, target, result, took in checks]
     return "\n".join(lines) + "\n"
 
 

@@ -57,8 +57,9 @@ class HelperTests(unittest.TestCase):
         facts = module.system_facts()
         self.assertEqual(facts[0][0], "Computer name")
         report = module.format_report(
-            facts, [("Internet", "1.1.1.1", "ok", "9 ms")], [("C:\\", "100 GB", "40 GB", "60 %")]
+            facts, [("Internet", "1.1.1.1", "\u2713 reachable", "9 ms")], [("C:\\", "100 GB", "40 GB", "60 %")]
         )
+        self.assertIn("reachable   9 ms", report)  # the columns do not run together
         for part in ("Support report", "This PC", "Drives", "Network", "1.1.1.1", "60 %"):
             self.assertIn(part, report)
         # ping output in the OEM code page (umlauts) must not matter
