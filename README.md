@@ -30,7 +30,7 @@ BareWinGUI is a pure GUI framework for Windows: native windows and controls from
 ### Installation
 
 ```bash
-pip install barewingui
+pip install --pre barewingui   # beta: pip needs --pre for pre-releases
 ```
 
 or from source:
@@ -123,7 +123,7 @@ BareWinGUI ist ein reines GUI-Framework für Windows: native Fenster und Steuere
 ### Installation
 
 ```bash
-pip install barewingui
+pip install --pre barewingui   # beta: pip needs --pre for pre-releases
 ```
 
 ### Schnellstart
