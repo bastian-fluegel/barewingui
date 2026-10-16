@@ -301,7 +301,10 @@ class Window(Container):
         if focus not in order:
             return False
         target = order[(order.index(focus) + (-1 if shift else 1)) % len(order)]
-        user32.SendMessageW(self._hwnd, _api.WM_NEXTDLGCTL, target, 1)
+        user32.SetFocus(target)
+        # like the dialog manager: edit-like controls get their text selected
+        if user32.SendMessageW(target, _api.WM_GETDLGCODE, 0, 0) & _api.DLGC_HASSETSEL:
+            user32.SendMessageW(target, _api.EM_SETSEL, 0, -1)
         return True
 
     def _tab_of(self, hwnd: int, tabs: list[Any]) -> Any:
