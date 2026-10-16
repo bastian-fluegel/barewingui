@@ -6,6 +6,8 @@
 
 [🇬🇧 English](#barewingui-en) • [🇩🇪 Deutsch](#barewingui-de)
 
+<img src="docs/hero.png" alt="About 20 lines of Python (left) become a native Windows settings dialog (right)" width="860">
+
 </div>
 
 ---
