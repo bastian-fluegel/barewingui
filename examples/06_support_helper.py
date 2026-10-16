@@ -158,11 +158,12 @@ def format_report(facts, checks, drives) -> str:
 
 
 # -- the window ------------------------------------------------------------------------------
-def build() -> Window:
+def build(autorun: bool = False) -> Window:
+    """The window. With ``autorun`` the network checks start right away."""
     app = App.current()
     facts = system_facts()
     drives = drive_rows()
-    with Window("Support Helper", size=(700, 500)) as win:
+    with Window("Support Helper", size=(680, 410)) as win:
         status = StatusBar(parts=[420, None])
         with VBox(padding=12, gap=10):
             with TabControl(grow=1):
@@ -245,10 +246,12 @@ def build() -> Window:
     win.default_button = close
     status.text = f"{facts[0][1]}  -  {facts[3][1]}"
     status[1] = "Ready"
+    if autorun:
+        start()
     return win
 
 
 if __name__ == "__main__":
     app = App()
-    build()
+    build(autorun=True)
     app.run()
