@@ -70,6 +70,7 @@ app.run()
 
 Run them with `python examples/<file>.py`:
 
+* `00_ping_tool.py`: a complete little tool in about 30 lines (ComboBox, SpinBox, worker thread)
 * `01_form.py`: registration form with live validation
 * `02_file_browser.py`: menu, `TreeView` (lazy loading), `ListView`, `StatusBar`
 * `03_settings.py`: settings dialog with tabs, groups, slider, spin box
