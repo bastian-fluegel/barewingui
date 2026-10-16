@@ -48,6 +48,21 @@ class HelperTests(unittest.TestCase):
             self.assertEqual(len(module.list_dir(root, True)[1]), 2)
         self.assertEqual(module.list_dir(Path(tmp) / "missing", True), ([], []))
 
+    def test_support_helper_helpers(self):
+        module = load("06_support_helper")
+        self.assertEqual(module.human_size(1536), "1.5 KB")
+        self.assertEqual(module.parse_ping("Antwort von 1.1.1.1: Bytes=32 Zeit=12ms TTL=57"), (True, "12 ms"))
+        self.assertEqual(module.parse_ping("Reply from 1.1.1.1: bytes=32 time<1ms TTL=57"), (True, "1 ms"))
+        self.assertEqual(module.parse_ping("Request timed out."), (False, ""))
+        facts = module.system_facts()
+        self.assertEqual(facts[0][0], "Computer name")
+        report = module.format_report(
+            facts, [("Internet", "1.1.1.1", "ok", "9 ms")], [("C:\\", "100 GB", "40 GB", "60 %")]
+        )
+        for part in ("Support report", "This PC", "Drives", "Network", "1.1.1.1", "60 %"):
+            self.assertIn(part, report)
+        self.assertIn(module.run_check("tcp", "localhost-does-not-exist.invalid")[0], (False,))
+
 
 @unittest.skipUnless(WINDOWS, "needs Windows")
 class ExampleWindowTests(unittest.TestCase):
@@ -113,6 +128,17 @@ class ExampleWindowTests(unittest.TestCase):
         timer.start()
         self.app.run()
         self.assertEqual(seen, {"value": 5, "text": "Done."})
+
+    def test_support_helper_has_three_tabs_and_lists_facts(self):
+        from barewingui import ListView, TabControl
+
+        win = load("06_support_helper").build()
+        win.show()
+        tabs = controls_of(win, TabControl)[0]
+        self.assertEqual([p.title for p in tabs.pages], ["This PC", "Network", "Drives"])
+        views = controls_of(win, ListView)
+        self.assertEqual(views[0].rows[0][0], "Computer name")
+        self.assertEqual(len(views[1]), 0)  # the network checks run on demand
 
 
 if __name__ == "__main__":

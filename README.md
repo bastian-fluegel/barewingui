@@ -75,6 +75,7 @@ Run them with `python examples/<file>.py`:
 * `03_settings.py`: settings dialog with tabs, groups, slider, spin box
 * `04_editor.py`: text editor with file dialogs and shortcuts
 * `05_progress.py`: long task in a worker thread, reporting back with `app.invoke`
+* `06_support_helper.py`: a small admin tool: tabs, group boxes, network checks in a worker thread, saving a report
 
 ### Known Limits (Beta)
 
@@ -141,7 +142,7 @@ app.run()
 
 ### Beispiele
 
-Start mit `python examples/<Datei>.py`: Formular mit Prüfung (`01_form.py`), Dateibrowser (`02_file_browser.py`), Einstellungsdialog (`03_settings.py`), Texteditor (`04_editor.py`), Fortschritt mit Arbeitsthread (`05_progress.py`).
+Start mit `python examples/<Datei>.py`: Formular mit Prüfung (`01_form.py`), Dateibrowser (`02_file_browser.py`), Einstellungsdialog (`03_settings.py`), Texteditor (`04_editor.py`), Fortschritt mit Arbeitsthread (`05_progress.py`), Support-Helfer mit Netzwerkprüfung (`06_support_helper.py`).
 
 ### Bekannte Grenzen (Beta)
 
