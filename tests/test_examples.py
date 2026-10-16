@@ -61,6 +61,8 @@ class HelperTests(unittest.TestCase):
         )
         for part in ("Support report", "This PC", "Drives", "Network", "1.1.1.1", "60 %"):
             self.assertIn(part, report)
+        # ping output in the OEM code page (umlauts) must not matter
+        self.assertEqual(module.parse_ping("Antwort von 1.1.1.1: Bytes=32 Zeit=5ms TTL=57"), (True, "5 ms"))
         self.assertIn(module.run_check("tcp", "localhost-does-not-exist.invalid")[0], (False,))
 
 

@@ -129,16 +129,17 @@ def run_check(kind: str, target: str) -> tuple[bool, str]:
             flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             result = subprocess.run(
                 ["ping", "-n", "1", "-w", "1500", target],
-                capture_output=True, text=True, timeout=6, creationflags=flags,
+                capture_output=True, timeout=6, creationflags=flags,
             )
-            return parse_ping(result.stdout)
+            # ping prints in the console's OEM code page (not UTF-8): read bytes, ignore umlauts
+            return parse_ping(result.stdout.decode("ascii", errors="ignore"))
         if kind == "dns":
             socket.gethostbyname(target)
         elif kind == "tcp":
             socket.create_connection((target, 443), timeout=3).close()
         else:
             raise ValueError(kind)
-    except (OSError, subprocess.SubprocessError):
+    except Exception:  # noqa: BLE001 - a failing check must not stop the others
         return False, ""
     return True, f"{(time.perf_counter() - started) * 1000:.0f} ms"
 
