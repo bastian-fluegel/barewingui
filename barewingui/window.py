@@ -235,6 +235,84 @@ class Window(Container):
                 user32.EnableWindow(owner, True)
                 user32.SetForegroundWindow(owner)
 
+    # -- keyboard navigation with tab controls --------------------------------------
+    def _tab_controls(self) -> list[Any]:
+        from barewingui.controls.tabs import TabControl
+
+        return [c for c in self._controls.values() if isinstance(c, TabControl)]
+
+    def _tab_order(self, tabs: list[Any]) -> list[int]:
+        """
+        Tab stops of the window in navigation order. A tab control is a stop
+        itself and is followed by the stops of its visible page (Windows' own
+        dialog manager skips a tab control that is a container).
+        """
+        containers = {self._hwnd}
+        for tab in tabs:
+            containers.add(tab.hwnd)
+            containers.update(page._page_hwnd for page in tab._pages)
+        order: list[int] = []
+
+        def walk(parent: int) -> None:
+            child = user32.GetWindow(parent, _api.GW_CHILD)
+            while child:
+                if user32.IsWindowVisible(child):
+                    if (
+                        user32.IsWindowEnabled(child)
+                        and user32.GetWindowLongW(child, _api.GWL_STYLE) & _api.WS_TABSTOP
+                    ):
+                        order.append(child)
+                    if child in containers:
+                        walk(child)
+                child = user32.GetWindow(child, _api.GW_HWNDNEXT)
+
+        walk(self._hwnd)
+        return order
+
+    def _tab_keys(self, msg: Any) -> bool:
+        """
+        Tab / Shift+Tab through all controls including the tab headers, and
+        Ctrl+Tab / Ctrl+Shift+Tab / Ctrl+PageUp / Ctrl+PageDown to switch tab pages.
+        Returns True when the key was handled.
+        """
+        vk = int(msg.wParam)
+        if vk not in (_api.VK_TAB, _api.VK_PRIOR, _api.VK_NEXT):
+            return False
+        tabs = self._tab_controls()
+        if not tabs:
+            return False
+        ctrl = user32.GetKeyState(_api.VK_CONTROL) < 0
+        shift = user32.GetKeyState(_api.VK_SHIFT) < 0
+        focus = user32.GetFocus()
+        if not focus:
+            return False
+        if ctrl:
+            tab = self._tab_of(focus, tabs)
+            if tab is None or not tab._pages:
+                return False
+            forward = vk == _api.VK_NEXT or (vk == _api.VK_TAB and not shift)
+            tab.selected_index = (tab.selected_index + (1 if forward else -1)) % len(tab._pages)
+            user32.SetFocus(tab.hwnd)  # the old page's control is hidden now
+            tab.on_change.emit()
+            return True
+        if vk != _api.VK_TAB:
+            return False
+        order = self._tab_order(tabs)
+        if focus not in order:
+            return False
+        target = order[(order.index(focus) + (-1 if shift else 1)) % len(order)]
+        user32.SendMessageW(self._hwnd, _api.WM_NEXTDLGCTL, target, 1)
+        return True
+
+    def _tab_of(self, hwnd: int, tabs: list[Any]) -> Any:
+        """The tab control that is or contains ``hwnd``."""
+        by_hwnd = {tab.hwnd: tab for tab in tabs}
+        while hwnd and hwnd != self._hwnd:
+            if hwnd in by_hwnd:
+                return by_hwnd[hwnd]
+            hwnd = user32.GetParent(hwnd)
+        return None
+
     def relayout(self) -> None:
         """Place the root container to fill the client area."""
         if self._hwnd is None or self._root is None:

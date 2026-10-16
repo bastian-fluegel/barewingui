@@ -341,6 +341,23 @@ class ViewControlTests(unittest.TestCase):
             node = _user32.GetWindow(node, 3)
         self.assertIn(remember.hwnd, over_group)
 
+    def test_tab_order_includes_the_tab_headers(self):
+        with Window("t", size=(500, 400)) as win:
+            with VBox(padding=8):
+                first = TextBox("x")
+                with TabControl(grow=1) as tabs:
+                    with TabPage("General"):
+                        inside = TextBox("y")
+                    with TabPage("Advanced"):
+                        hidden = TextBox("z")
+                last = Button("OK")
+        win.show()
+        order = win._tab_order([tabs])
+        self.assertEqual(order, [first.hwnd, tabs.hwnd, inside.hwnd, last.hwnd])
+        self.assertNotIn(hidden.hwnd, order)
+        tabs.selected_index = 1
+        self.assertEqual(win._tab_order([tabs]), [first.hwnd, tabs.hwnd, hidden.hwnd, last.hwnd])
+
     def test_tab_control_rules(self):
         with Window("t"):
             with VBox():

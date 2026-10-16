@@ -317,6 +317,8 @@ class App:
             if window is not None:
                 if window._haccel and user32.TranslateAcceleratorW(root, window._haccel, p_msg):
                     continue
+                if msg.message == _api.WM_KEYDOWN and window._tab_keys(msg):
+                    continue
                 if user32.IsDialogMessageW(root, p_msg):
                     continue
             user32.TranslateMessage(p_msg)

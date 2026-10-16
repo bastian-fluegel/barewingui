@@ -63,6 +63,16 @@ CW_USEDEFAULT = -0x80000000
 COLOR_BTNFACE = 15
 IDC_ARROW = 32512
 GA_ROOT = 2
+GW_HWNDNEXT = 2
+GW_CHILD = 5
+GWL_STYLE = -16
+WM_KEYDOWN = 0x0100
+WM_NEXTDLGCTL = 0x0028
+VK_TAB = 0x09
+VK_SHIFT = 0x10
+VK_CONTROL = 0x11
+VK_PRIOR = 0x21
+VK_NEXT = 0x22
 ERROR_ACCESS_DENIED = 5
 ERROR_CLASS_ALREADY_EXISTS = 1410
 
@@ -706,6 +716,12 @@ user32 = _Library(
         "EnableWindow": (_BOOL, [HWND, _BOOL]),
         "IsWindowEnabled": (_BOOL, [HWND]),
         "SetFocus": (HWND, [HWND]),
+        "GetFocus": (HWND, []),
+        "GetParent": (HWND, [HWND]),
+        "GetWindow": (HWND, [HWND, _UINT]),
+        "GetWindowLongW": (ctypes.c_long, [HWND, _INT]),
+        "IsWindowVisible": (_BOOL, [HWND]),
+        "GetKeyState": (ctypes.c_short, [_INT]),
         "GetDC": (wintypes.HDC, [HWND]),
         "ReleaseDC": (_INT, [HWND, wintypes.HDC]),
         "SystemParametersInfoForDpi": (

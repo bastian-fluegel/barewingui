@@ -14,6 +14,7 @@ First beta of the rewrite. **Breaking:** the 0.1.x API (absolute `pos=`, `Window
 Known limits: Windows only, no dark mode, no grid layout, no rich text. Real mouse/keyboard behaviour, native dialogs and multi-monitor DPI changes are not covered by the automated tests; please report what you find.
 
 ### Added
+- Keyboard: Tab/Shift+Tab now reach the tab headers, Ctrl+Tab / Ctrl+Shift+Tab / Ctrl+PageUp / Ctrl+PageDown switch tab pages.
 - Publishing workflow (`publish.yml`, PyPI trusted publishing, TestPyPI via manual run); the logic CI job now builds and installs the wheel.
 - `examples/`: five runnable apps (registration form, file browser, settings dialog, text editor, progress with worker thread), covered by `tests/test_examples.py`.
 - Menus (`MenuBar`, `Menu`, `MenuItem`, `MenuSeparator`, `ContextMenu`), window-wide keyboard shortcuts (`shortcut=`, `Window.add_shortcut`), `Timer`, modal windows (`Window.show_modal`) and the standard dialogs (`message_box`, `ask_yes_no`, `open_file`, `save_file`, `pick_folder`, `choose_color`, `choose_font`, `input_box`).
